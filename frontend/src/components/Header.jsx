@@ -68,6 +68,11 @@ export default function Header() {
         navigate("/login");
     }
 
+    function sync() {
+        setIsDropdownOpen(false);
+        navigate("/sync");
+    }
+
     return (
         <div className="w-full h-full bg-Primary">
             <div className="container mx-auto py-6 px-4 flex flex-col items-center w-full">
@@ -101,9 +106,8 @@ export default function Header() {
                             <div
                                 className="absolute right-0 top-full mt-2 w-50 bg-white rounded-lg shadow-lg border border-gray-200 z-10">
                                 <ul className="py-2">
-                                    <li onClick={logout}
-                                        className="px-4 py-2 hover:bg-gray-100 cursor-pointer">Uitloggen
-                                    </li>
+                                    <li onClick={logout} className="px-4 py-2 hover:bg-gray-100 cursor-pointer">Uitloggen</li>
+                                    <li onClick={sync} className="px-4 py-2 hover:bg-gray-100 cursor-pointer">Uitloggen</li>
                                 </ul>
                             </div>
                         )}
