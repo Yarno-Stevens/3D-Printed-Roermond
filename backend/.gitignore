@@ -1,0 +1,17 @@
+# Maven
+target/
+
+# IntelliJ IDEA
+.idea/
+*.iml
+
+# macOS
+.DS_Store
+
+# Application properties with sensitive data
+application-local.properties
+application-*.properties
+application.properties
+
+# Logs
+*.log

@@ -1,0 +1,55 @@
+package nl.embediq.woocommerce.entity;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import jakarta.persistence.*;
+import lombok.Data;
+
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+
+@Entity
+@Table(name = "customers")
+@Data
+public class Customer {
+    
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+    
+    @Column(name = "woo_commerce_id", nullable = false, unique = true)
+    private Long wooCommerceId;
+    
+    @Column(name = "email", nullable = false)
+    private String email;
+    
+    @Column(name = "first_name")
+    private String firstName;
+    
+    @Column(name = "last_name")
+    private String lastName;
+    
+    @OneToMany(mappedBy = "customer", fetch = FetchType.LAZY)
+    @JsonIgnore
+    private List<Order> orders = new ArrayList<>();
+    
+    @Column(name = "last_synced_at")
+    private LocalDateTime lastSyncedAt;
+    
+    @Column(name = "created_at", updatable = false)
+    private LocalDateTime createdAt;
+    
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
+    
+    @PrePersist
+    protected void onCreate() {
+        createdAt = LocalDateTime.now();
+        updatedAt = LocalDateTime.now();
+    }
+    
+    @PreUpdate
+    protected void onUpdate() {
+        updatedAt = LocalDateTime.now();
+    }
+}
