@@ -6,7 +6,6 @@ import OrderOverview from "./order/OrderOverview.jsx";
 import ProductOverview from "./product/ProductOverview.jsx";
 import CustomerOverview from "./customer/CustomerOverview.jsx";
 import SyncDashboard from "./sync/SyncDashboard.jsx";
-import CustomerOrders from "./customer/CustomerOrders.jsx";
 import CustomerDetail from "./customer/CustomerDetail.jsx";
 import OrderDetail from "./order/OrderDetail.jsx";
 
@@ -23,7 +22,6 @@ function App() {
                     <Route path="/sync" element={<SyncDashboard/>}/>
                     <Route path="/orders/:id" element={<OrderDetail />} />
                     <Route path="/customers/:id" element={<CustomerDetail />} />
-                    <Route path="/customers/:id/orders" element={<CustomerOrders />} />
                 </Routes>
             </div>
         </>

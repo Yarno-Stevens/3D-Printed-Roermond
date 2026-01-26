@@ -9,9 +9,12 @@ import nl.embediq.woocommerce.enums.SyncStatusEnum;
 import nl.embediq.woocommerce.enums.SyncType;
 import nl.embediq.woocommerce.repository.CustomerRepository;
 import nl.embediq.woocommerce.repository.OrderRepository;
+import nl.embediq.woocommerce.repository.ProductRepository;
 import nl.embediq.woocommerce.repository.SyncStatusRepository;
 import nl.embediq.woocommerce.service.CustomerSyncService;
 import nl.embediq.woocommerce.service.OrderSyncService;
+import nl.embediq.woocommerce.service.ProductSyncService;
+import nl.embediq.woocommerce.service.WooCommerceSyncScheduler;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -44,10 +47,16 @@ public class SyncMonitorController {
     private CustomerRepository customerRepository;
 
     @Autowired
+    private ProductRepository productRepository;
+
+    @Autowired
     private OrderSyncService orderSyncService;
 
     @Autowired
     private CustomerSyncService customerSyncService;
+
+    @Autowired
+    private ProductSyncService productSyncService;
 
     // ==================== DASHBOARD ====================
 
@@ -65,18 +74,35 @@ public class SyncMonitorController {
                 .findFirst()
                 .orElse(null);
 
+        SyncStatus productSync = statuses.stream()
+                .filter(s -> s.getSyncType() == SyncType.PRODUCT)
+                .findFirst()
+                .orElse(null);
+
         long totalOrders = orderRepository.count();
         long totalCustomers = customerRepository.count();
+        long totalProducts = productRepository.count();
         long ordersSyncedToday = orderRepository.countSyncedSince(
                 LocalDateTime.now().minusDays(1)
         );
+        long customersSyncedToday = customerRepository.countSyncedSince(
+                LocalDateTime.now().minusDays(1)
+        );
+        long productsSyncedToday = productRepository.countSyncedSince(
+                LocalDateTime.now().minusDays(1)
+        );
+
 
         SyncDashboard dashboard = new SyncDashboard();
         dashboard.setOrderSync(orderSync);
         dashboard.setCustomerSync(customerSync);
+        dashboard.setProductSync(productSync);
         dashboard.setTotalOrders(totalOrders);
         dashboard.setTotalCustomers(totalCustomers);
+        dashboard.setTotalProducts(totalProducts);
         dashboard.setOrdersSyncedToday(ordersSyncedToday);
+        dashboard.setCustomersSyncedToday(customersSyncedToday);
+        dashboard.setProductsSyncedToday(productsSyncedToday);
         dashboard.setLastUpdate(LocalDateTime.now());
 
         return ResponseEntity.ok(dashboard);
@@ -238,6 +264,24 @@ public class SyncMonitorController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
+    @GetMapping("/customers/{customerId}/orders")
+    public ResponseEntity<List<OrderDTO>> getOrdersByCustomer(@PathVariable Long customerId) {
+        if (!customerRepository.existsById(customerId)) {
+            return ResponseEntity.notFound().build();
+        }
+
+        List<Order> customerOrders = orderRepository.findAll().stream()
+                .filter(o -> o.getCustomer() != null && o.getCustomer().getId().equals(customerId))
+                .sorted((o1, o2) -> o2.getCreatedAt().compareTo(o1.getCreatedAt()))
+                .collect(Collectors.toList());
+
+        List<OrderDTO> orderDTOs = customerOrders.stream()
+                .map(this::convertToOrderDTO)
+                .collect(Collectors.toList());
+
+        return ResponseEntity.ok(orderDTOs);
+    }
+
     // ==================== STATS ENDPOINTS ====================
 
     @GetMapping("/stats")
@@ -300,6 +344,7 @@ public class SyncMonitorController {
                 log.info("Starting manual sync...");
                 customerSyncService.syncCustomers();
                 orderSyncService.syncOrders();
+
                 log.info("Manual sync completed");
             } catch (Exception e) {
                 log.error("Error during manual sync", e);

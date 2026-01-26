@@ -163,6 +163,7 @@ export default function SyncDashboard () {
 
             {/* Status Cards */}
             <Grid container spacing={3} mb={3}>
+
                 <Grid item xs={12} md={3}>
                     <Card>
                         <CardContent>
@@ -188,6 +189,53 @@ export default function SyncDashboard () {
                             <Typography variant="h4">
                                 {dashboard?.totalCustomers || 0}
                             </Typography>
+                            <Typography variant="caption" color="textSecondary">
+                                {dashboard?.customersSyncedToday || 0} vandaag gesynchroniseerd
+                            </Typography>
+                        </CardContent>
+                    </Card>
+                </Grid>
+
+                <Grid item xs={12} md={3}>
+                    <Card>
+                        <CardContent>
+                            <Typography color="textSecondary" gutterBottom>
+                                Totaal Producten
+                            </Typography>
+                            <Typography variant="h4">
+                                {dashboard?.totalProducts || 0}
+                            </Typography>
+                            <Typography variant="caption" color="textSecondary">
+                                {dashboard?.productsSyncedToday || 0} vandaag gesynchroniseerd
+                            </Typography>
+                        </CardContent>
+                    </Card>
+                </Grid>
+
+                <Grid item xs={12} md={3}>
+                    <Card>
+                        <CardContent>
+                            <Typography color="textSecondary" gutterBottom>
+                                Product Sync Status
+                            </Typography>
+                            <Box display="flex" alignItems="center" gap={1}>
+                                {dashboard?.productSync && getStatusIcon(dashboard.productSync.status)}
+                                <Chip
+                                    label={getSyncStatusLabel(dashboard?.productSync?.status) || 'Onbekend'}
+                                    color={getStatusColor(dashboard?.productSync?.status)}
+                                    size="small"
+                                />
+                            </Box>
+                            <Typography variant="caption" color="textSecondary" display="block" mt={1}>
+                                Laatste sync: {formatDate(dashboard?.productSync?.lastSuccessfulSync)}
+                            </Typography>
+                            {dashboard?.productSync?.totalRecordsProcessed > 0 && (
+                                <Typography variant="caption" display="block">
+                                    Verwerkt: {dashboard.productSync.totalRecordsProcessed}
+                                    {dashboard.productSync.failedRecords > 0 &&
+                                        ` (${dashboard.productSync.failedRecords} gefaald)`}
+                                </Typography>
+                            )}
                         </CardContent>
                     </Card>
                 </Grid>

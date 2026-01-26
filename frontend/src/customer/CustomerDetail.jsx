@@ -16,10 +16,13 @@ import {
     TableContainer,
     TableHead,
     TableRow,
+    TablePagination,
     CircularProgress,
     Alert,
     IconButton,
-    Avatar
+    Avatar,
+    Tabs,
+    Tab
 } from '@mui/material';
 import {
     ArrowBack,
@@ -40,6 +43,11 @@ export default function CustomerDetail() {
     const [orders, setOrders] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [activeTab, setActiveTab] = useState(0);
+
+    // Pagination
+    const [page, setPage] = useState(0);
+    const [rowsPerPage, setRowsPerPage] = useState(10);
 
     useEffect(() => {
         fetchCustomerDetail();
@@ -61,15 +69,20 @@ export default function CustomerDetail() {
 
     const fetchCustomerOrders = async () => {
         try {
-            // Haal alle orders op en filter op deze customer
-            const response = await axios.get(`${API_BASE_URL}/orders`);
-            const customerOrders = response.data.content.filter(
-                order => order.customer && order.customer.id === parseInt(id)
-            );
-            setOrders(customerOrders);
+            const response = await axios.get(`${API_BASE_URL}/customers/${id}/orders`);
+            setOrders(response.data);
         } catch (err) {
             console.error('Fout bij ophalen van orders:', err);
         }
+    };
+
+    const handleChangePage = (event, newPage) => {
+        setPage(newPage);
+    };
+
+    const handleChangeRowsPerPage = (event) => {
+        setRowsPerPage(parseInt(event.target.value, 10));
+        setPage(0);
     };
 
     const formatDate = (dateString) => {
@@ -91,6 +104,8 @@ export default function CustomerDetail() {
     };
 
     const getStatusColor = (status) => {
+        if (!status) return 'default';
+        const lowerStatus = status.toLowerCase();
         const statusColors = {
             'pending': 'warning',
             'processing': 'info',
@@ -100,10 +115,12 @@ export default function CustomerDetail() {
             'refunded': 'error',
             'failed': 'error'
         };
-        return statusColors[status] || 'default';
+        return statusColors[lowerStatus] || 'default';
     };
 
     const getStatusLabel = (status) => {
+        if (!status) return '-';
+        const lowerStatus = status.toLowerCase();
         const statusLabels = {
             'pending': 'In Afwachting',
             'processing': 'In Behandeling',
@@ -113,13 +130,18 @@ export default function CustomerDetail() {
             'refunded': 'Terugbetaald',
             'failed': 'Mislukt'
         };
-        return statusLabels[status] || status;
+        return statusLabels[lowerStatus] || status;
     };
 
     const calculateTotalSpent = () => {
         return orders
-            .filter(order => order.status === 'completed')
-            .reduce((sum, order) => sum + parseFloat(order.total), 0);
+            .filter(order => order.status?.toLowerCase() === 'completed')
+            .reduce((sum, order) => {
+                const amount = typeof order.total === 'string'
+                    ? parseFloat(order.total)
+                    : order.total;
+                return sum + (isNaN(amount) ? 0 : amount);
+            }, 0);
     };
 
     if (loading) {
@@ -179,178 +201,221 @@ export default function CustomerDetail() {
                 )}
             </Box>
 
-            <Grid container spacing={3}>
-                {/* Klant Informatie */}
-                <Grid item xs={12} md={4}>
-                    <Card sx={{ mb: 3 }}>
-                        <CardContent>
-                            <Typography variant="h6" gutterBottom>
-                                <Person sx={{ verticalAlign: 'middle', mr: 1 }} />
-                                Klant Informatie
-                            </Typography>
-                            <Divider sx={{ my: 2 }} />
-                            
-                            <Box mb={2}>
-                                <Typography variant="body2" color="textSecondary" gutterBottom>
-                                    Naam
-                                </Typography>
-                                <Typography variant="body1" fontWeight="bold">
-                                    {customer.firstName} {customer.lastName}
-                                </Typography>
-                            </Box>
-
-                            <Box mb={2}>
-                                <Typography variant="body2" color="textSecondary" gutterBottom>
-                                    <Email fontSize="small" sx={{ verticalAlign: 'middle', mr: 0.5 }} />
-                                    Email
-                                </Typography>
-                                <Typography variant="body1">
-                                    {customer.email}
-                                </Typography>
-                            </Box>
-
-                            <Box mb={2}>
-                                <Typography variant="body2" color="textSecondary" gutterBottom>
-                                    WooCommerce ID
-                                </Typography>
-                                <Typography variant="body1">
-                                    {customer.wooCommerceId || 'Gast'}
-                                </Typography>
-                            </Box>
-
-                            <Divider sx={{ my: 2 }} />
-
-                            <Box mb={2}>
-                                <Typography variant="body2" color="textSecondary" gutterBottom>
-                                    <CalendarToday fontSize="small" sx={{ verticalAlign: 'middle', mr: 0.5 }} />
-                                    Geregistreerd
-                                </Typography>
-                                <Typography variant="body1">
-                                    {formatDate(customer.createdAt)}
-                                </Typography>
-                            </Box>
-
-                            <Box mb={2}>
-                                <Typography variant="body2" color="textSecondary" gutterBottom>
-                                    <Sync fontSize="small" sx={{ verticalAlign: 'middle', mr: 0.5 }} />
-                                    Laatst Gesynchroniseerd
-                                </Typography>
-                                <Typography variant="body1">
-                                    {formatDate(customer.lastSyncedAt)}
-                                </Typography>
-                            </Box>
-                        </CardContent>
-                    </Card>
-
-                    {/* Statistieken */}
+            {/* Statistieken Cards */}
+            <Grid container spacing={3} mb={3}>
+                <Grid item xs={12} md={3}>
                     <Card>
                         <CardContent>
-                            <Typography variant="h6" gutterBottom>
+                            <Typography color="textSecondary" gutterBottom>
                                 <ShoppingCart sx={{ verticalAlign: 'middle', mr: 1 }} />
-                                Statistieken
+                                Totaal Orders
                             </Typography>
-                            <Divider sx={{ my: 2 }} />
-                            
-                            <Box mb={2}>
-                                <Typography variant="body2" color="textSecondary" gutterBottom>
-                                    Totaal Orders
-                                </Typography>
-                                <Typography variant="h4" fontWeight="bold" color="primary">
-                                    {orders.length}
-                                </Typography>
-                            </Box>
-
-                            <Box mb={2}>
-                                <Typography variant="body2" color="textSecondary" gutterBottom>
-                                    Voltooide Orders
-                                </Typography>
-                                <Typography variant="h4" fontWeight="bold">
-                                    {orders.filter(o => o.status === 'completed').length}
-                                </Typography>
-                            </Box>
-
-                            <Box>
-                                <Typography variant="body2" color="textSecondary" gutterBottom>
-                                    Totaal Uitgegeven
-                                </Typography>
-                                <Typography variant="h4" fontWeight="bold" color="success.main">
-                                    {formatCurrency(calculateTotalSpent())}
-                                </Typography>
-                            </Box>
+                            <Typography variant="h4" fontWeight="bold" color="primary">
+                                {orders.length}
+                            </Typography>
                         </CardContent>
                     </Card>
                 </Grid>
-
-                {/* Order Geschiedenis */}
-                <Grid item xs={12} md={8}>
+                <Grid item xs={12} md={3}>
                     <Card>
                         <CardContent>
-                            <Typography variant="h6" gutterBottom>
-                                Order Geschiedenis ({orders.length})
+                            <Typography color="textSecondary" gutterBottom>
+                                Voltooide Orders
                             </Typography>
-                            <Divider sx={{ my: 2 }} />
-                            
+                            <Typography variant="h4" fontWeight="bold">
+                                {orders.filter(o => o.status?.toLowerCase() === 'completed').length}
+                            </Typography>
+                        </CardContent>
+                    </Card>
+                </Grid>
+                <Grid item xs={12} md={3}>
+                    <Card>
+                        <CardContent>
+                            <Typography color="textSecondary" gutterBottom>
+                                Totaal Uitgegeven
+                            </Typography>
+                            <Typography variant="h4" fontWeight="bold" color="success.main">
+                                {formatCurrency(calculateTotalSpent())}
+                            </Typography>
+                        </CardContent>
+                    </Card>
+                </Grid>
+                <Grid item xs={12} md={3}>
+                    <Card>
+                        <CardContent>
+                            <Typography color="textSecondary" gutterBottom>
+                                <CalendarToday fontSize="small" sx={{ verticalAlign: 'middle', mr: 0.5 }} />
+                                Lid sinds
+                            </Typography>
+                            <Typography variant="body1" fontWeight="bold">
+                                {formatDate(customer.createdAt)}
+                            </Typography>
+                        </CardContent>
+                    </Card>
+                </Grid>
+            </Grid>
+
+            {/* Tabs */}
+            <Card>
+                <Tabs value={activeTab} onChange={(e, newValue) => setActiveTab(newValue)}>
+                    <Tab label="Klant Informatie" icon={<Person />} iconPosition="start" />
+                    <Tab label={`Orders (${orders.length})`} icon={<ShoppingCart />} iconPosition="start" />
+                </Tabs>
+
+                <Divider />
+
+                <CardContent>
+                    {/* Tab 0: Klant Informatie */}
+                    {activeTab === 0 && (
+                        <Grid container spacing={3}>
+                            <Grid item xs={12} md={6}>
+                                <Typography variant="h6" gutterBottom>
+                                    Contactgegevens
+                                </Typography>
+                                <Box mb={2}>
+                                    <Typography variant="body2" color="textSecondary" gutterBottom>
+                                        Naam
+                                    </Typography>
+                                    <Typography variant="body1" fontWeight="bold">
+                                        {customer.firstName} {customer.lastName}
+                                    </Typography>
+                                </Box>
+                                <Box mb={2}>
+                                    <Typography variant="body2" color="textSecondary" gutterBottom>
+                                        <Email fontSize="small" sx={{ verticalAlign: 'middle', mr: 0.5 }} />
+                                        Email
+                                    </Typography>
+                                    <Typography variant="body1">
+                                        {customer.email}
+                                    </Typography>
+                                </Box>
+                                <Box mb={2}>
+                                    <Typography variant="body2" color="textSecondary" gutterBottom>
+                                        WooCommerce ID
+                                    </Typography>
+                                    <Typography variant="body1">
+                                        {customer.wooCommerceId || 'Gast'}
+                                    </Typography>
+                                </Box>
+                            </Grid>
+
+                            <Grid item xs={12} md={6}>
+                                <Typography variant="h6" gutterBottom>
+                                    Synchronisatie
+                                </Typography>
+                                <Box mb={2}>
+                                    <Typography variant="body2" color="textSecondary" gutterBottom>
+                                        <CalendarToday fontSize="small" sx={{ verticalAlign: 'middle', mr: 0.5 }} />
+                                        Geregistreerd
+                                    </Typography>
+                                    <Typography variant="body1">
+                                        {formatDate(customer.createdAt)}
+                                    </Typography>
+                                </Box>
+                                <Box mb={2}>
+                                    <Typography variant="body2" color="textSecondary" gutterBottom>
+                                        <Sync fontSize="small" sx={{ verticalAlign: 'middle', mr: 0.5 }} />
+                                        Laatst Gesynchroniseerd
+                                    </Typography>
+                                    <Typography variant="body1">
+                                        {formatDate(customer.lastSyncedAt)}
+                                    </Typography>
+                                </Box>
+                            </Grid>
+                        </Grid>
+                    )}
+
+                    {/* Tab 1: Orders */}
+                    {activeTab === 1 && (
+                        <>
                             {orders.length === 0 ? (
                                 <Alert severity="info">
                                     Deze klant heeft nog geen orders geplaatst.
                                 </Alert>
                             ) : (
-                                <TableContainer>
-                                    <Table>
-                                        <TableHead>
-                                            <TableRow>
-                                                <TableCell>Order #</TableCell>
-                                                <TableCell>Status</TableCell>
-                                                <TableCell align="right">Totaal</TableCell>
-                                                <TableCell>Datum</TableCell>
-                                                <TableCell align="center">Acties</TableCell>
-                                            </TableRow>
-                                        </TableHead>
-                                        <TableBody>
-                                            {orders
-                                                .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-                                                .map((order) => (
-                                                <TableRow key={order.id} hover>
-                                                    <TableCell>
-                                                        <Typography variant="body2" fontWeight="bold">
-                                                            #{order.orderNumber}
-                                                        </Typography>
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <Chip
-                                                            label={getStatusLabel(order.status)}
-                                                            color={getStatusColor(order.status)}
-                                                            size="small"
-                                                        />
-                                                    </TableCell>
-                                                    <TableCell align="right">
-                                                        <Typography variant="body2" fontWeight="bold">
-                                                            {formatCurrency(order.total)}
-                                                        </Typography>
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <Typography variant="body2">
-                                                            {formatDate(order.createdAt)}
-                                                        </Typography>
-                                                    </TableCell>
-                                                    <TableCell align="center">
-                                                        <IconButton
-                                                            size="small"
-                                                            onClick={() => navigate(`/orders/${order.id}`)}
-                                                        >
-                                                            <Visibility fontSize="small" />
-                                                        </IconButton>
-                                                    </TableCell>
+                                <>
+                                    <TableContainer>
+                                        <Table>
+                                            <TableHead>
+                                                <TableRow>
+                                                    <TableCell>Order #</TableCell>
+                                                    <TableCell>Status</TableCell>
+                                                    <TableCell align="right">Totaal</TableCell>
+                                                    <TableCell>Datum</TableCell>
+                                                    <TableCell>Items</TableCell>
+                                                    <TableCell align="center">Acties</TableCell>
                                                 </TableRow>
-                                            ))}
-                                        </TableBody>
-                                    </Table>
-                                </TableContainer>
+                                            </TableHead>
+                                            <TableBody>
+                                                {orders
+                                                    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+                                                    .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+                                                    .map((order) => (
+                                                        <TableRow key={order.id} hover>
+                                                            <TableCell>
+                                                                <Typography variant="body2" fontWeight="bold">
+                                                                    #{order.orderNumber}
+                                                                </Typography>
+                                                                <Typography variant="caption" color="textSecondary">
+                                                                    ID: {order.wooCommerceId}
+                                                                </Typography>
+                                                            </TableCell>
+                                                            <TableCell>
+                                                                <Chip
+                                                                    label={getStatusLabel(order.status)}
+                                                                    color={getStatusColor(order.status)}
+                                                                    size="small"
+                                                                />
+                                                            </TableCell>
+                                                            <TableCell align="right">
+                                                                <Typography variant="body2" fontWeight="bold">
+                                                                    {formatCurrency(order.total)}
+                                                                </Typography>
+                                                            </TableCell>
+                                                            <TableCell>
+                                                                <Typography variant="body2">
+                                                                    {formatDate(order.createdAt)}
+                                                                </Typography>
+                                                            </TableCell>
+                                                            <TableCell>
+                                                                <Chip
+                                                                    label={`${order.itemsCount || 0} items`}
+                                                                    size="small"
+                                                                    variant="outlined"
+                                                                />
+                                                            </TableCell>
+                                                            <TableCell align="center">
+                                                                <IconButton
+                                                                    size="small"
+                                                                    onClick={() => navigate(`/orders/${order.id}`)}
+                                                                >
+                                                                    <Visibility fontSize="small" />
+                                                                </IconButton>
+                                                            </TableCell>
+                                                        </TableRow>
+                                                    ))}
+                                            </TableBody>
+                                        </Table>
+                                    </TableContainer>
+                                    <TablePagination
+                                        component="div"
+                                        count={orders.length}
+                                        page={page}
+                                        onPageChange={handleChangePage}
+                                        rowsPerPage={rowsPerPage}
+                                        onRowsPerPageChange={handleChangeRowsPerPage}
+                                        rowsPerPageOptions={[5, 10, 25, 50]}
+                                        labelRowsPerPage="Rijen per pagina:"
+                                        labelDisplayedRows={({ from, to, count }) =>
+                                            `${from}-${to} van ${count !== -1 ? count : `meer dan ${to}`}`
+                                        }
+                                    />
+                                </>
                             )}
-                        </CardContent>
-                    </Card>
-                </Grid>
-            </Grid>
+                        </>
+                    )}
+                </CardContent>
+            </Card>
         </Box>
     );
 }

@@ -12,33 +12,43 @@ import java.time.LocalDateTime;
 @Component
 @Slf4j
 @ConditionalOnProperty(
-    value = "woocommerce.sync.enabled", 
-    havingValue = "true", 
-    matchIfMissing = true
+        value = "woocommerce.sync.enabled",
+        havingValue = "true",
+        matchIfMissing = true
 )
 public class WooCommerceSyncScheduler {
-    
+
     @Autowired
     private CustomerSyncService customerSyncService;
-    
+
     @Autowired
     private OrderSyncService orderSyncService;
-    
+
+    @Autowired
+    private ProductSyncService productSyncService;  // ← NIEUW!
+
     @Scheduled(cron = "${woocommerce.sync.cron}")
     public void syncWooCommerceData() {
         log.info("=== Starting WooCommerce synchronization ===");
-        
+
         try {
-            // First sync customers (orders depend on them)
+            // First sync products (orders kunnen naar SKU's refereren)
+            log.info("📦 Syncing products...");
+            SyncResult productResult = productSyncService.syncProducts();
+            log.info("Product sync result: {}", productResult);
+
+            // Then sync customers (orders depend on them)
+            log.info("📊 Syncing customers...");
             SyncResult customerResult = customerSyncService.syncCustomers();
             log.info("Customer sync result: {}", customerResult);
-            
+
             // Then sync orders
+            log.info("🛒 Syncing orders...");
             SyncResult orderResult = orderSyncService.syncOrders();
             log.info("Order sync result: {}", orderResult);
-            
+
             log.info("=== WooCommerce synchronization completed ===");
-            
+
         } catch (Exception e) {
             log.error("Fatal error during WooCommerce sync", e);
         }

@@ -33,10 +33,12 @@ import {
     Visibility,
     GetApp
 } from '@mui/icons-material';
+import {useNavigate} from "react-router";
 
 const API_BASE_URL = 'http://localhost:8080/api/admin/sync';
 
 export default function OrdersOverview() {
+    const navigate = useNavigate();
     const [orders, setOrders] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -116,6 +118,8 @@ export default function OrdersOverview() {
     };
 
     const getStatusColor = (status) => {
+        if (!status) return 'default';
+        const lowerStatus = status.toLowerCase();
         const statusColors = {
             'pending': 'warning',
             'processing': 'info',
@@ -125,7 +129,7 @@ export default function OrdersOverview() {
             'refunded': 'error',
             'failed': 'error'
         };
-        return statusColors[status] || 'default';
+        return statusColors[lowerStatus] || 'default';
     };
 
     const getStatusLabel = (status) => {
@@ -153,15 +157,6 @@ export default function OrdersOverview() {
         return statusLabels[status] || statusLabels[status.toLowerCase()] || status;
     };
 
-    const exportOrders = () => {
-        window.open(`${API_BASE_URL}/orders/export?${new URLSearchParams({
-            search: searchQuery || '',
-            status: statusFilter || '',
-            dateFrom: dateFrom || '',
-            dateTo: dateTo || ''
-        })}`, '_blank');
-    };
-
     return (
         <Box sx={{ p: 3 }}>
             <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
@@ -174,13 +169,6 @@ export default function OrdersOverview() {
                         sx={{ mr: 1 }}
                     >
                         Ververs
-                    </Button>
-                    <Button
-                        variant="outlined"
-                        startIcon={<GetApp />}
-                        onClick={exportOrders}
-                    >
-                        Exporteer
                     </Button>
                 </Box>
             </Box>
@@ -357,7 +345,7 @@ export default function OrdersOverview() {
                                                         <Tooltip title="Bekijk Details">
                                                             <IconButton
                                                                 size="small"
-                                                                onClick={() => window.open(`/orders/${order.id}`, '_blank')}
+                                                                onClick={() => navigate(`/orders/${order.id}`)}
                                                             >
                                                                 <Visibility fontSize="small" />
                                                             </IconButton>

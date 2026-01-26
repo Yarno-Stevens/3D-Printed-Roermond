@@ -9,8 +9,12 @@ import java.time.LocalDateTime;
 public class SyncDashboard {
     private SyncStatus orderSync;
     private SyncStatus customerSync;
+    private SyncStatus productSync;
     private Long totalOrders;
     private Long totalCustomers;
+    private Long totalProducts;
     private Long ordersSyncedToday;
+    private Long customersSyncedToday;
+    private Long productsSyncedToday;
     private LocalDateTime lastUpdate;
 }

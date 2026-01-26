@@ -3,6 +3,8 @@ package nl.embediq.woocommerce.service;
 import lombok.extern.slf4j.Slf4j;
 import nl.embediq.woocommerce.dto.WooCustomer;
 import nl.embediq.woocommerce.dto.WooOrder;
+import nl.embediq.woocommerce.dto.WooProduct;
+import nl.embediq.woocommerce.dto.WooProductVariation;
 import nl.embediq.woocommerce.exception.WooCommerceApiException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -18,6 +20,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
 import java.util.Base64;
+import java.util.Collections;
 import java.util.List;
 
 @Service
@@ -118,6 +121,62 @@ public class WooCommerceClient {
         } catch (Exception e) {
             log.error("Error fetching customers from WooCommerce: page={}", page, e);
             throw new WooCommerceApiException("Failed to fetch customers", e);
+        }
+    }
+
+    public List<WooProduct> getProducts(int page, LocalDateTime modifiedAfter) {
+        StringBuilder url = new StringBuilder(String.format(
+                "%s/wp-json/wc/v3/products?page=%d&per_page=100&orderby=id&order=asc",
+                baseUrl, page
+        ));
+
+        if (modifiedAfter != null) {
+            String modifiedAfterStr = modifiedAfter.format(DateTimeFormatter.ISO_DATE_TIME);
+            url.append("&modified_after=").append(modifiedAfterStr);
+        }
+
+        try {
+            ResponseEntity<WooProduct[]> response = wooCommerceRestTemplate.exchange(
+                    url.toString(),
+                    HttpMethod.GET,
+                    new HttpEntity<>(createAuthHeaders()),
+                    WooProduct[].class
+            );
+
+            if (response.getBody() != null) {
+                log.info("Retrieved {} products from page {}", response.getBody().length, page);
+                return Arrays.asList(response.getBody());
+            }
+            return Collections.emptyList();
+        } catch (Exception e) {
+            log.error("Error fetching products from WooCommerce (page {})", page, e);
+            throw new RuntimeException("Failed to fetch products", e);
+        }
+    }
+
+    public List<WooProductVariation> getProductVariations(Long productId) {
+        String url = String.format(
+                "%s/wp-json/wc/v3/products/%d/variations?per_page=100",
+                baseUrl, productId
+        );
+
+        try {
+            ResponseEntity<WooProductVariation[]> response = wooCommerceRestTemplate.exchange(
+                    url,
+                    HttpMethod.GET,
+                    new HttpEntity<>(createAuthHeaders()),
+                    WooProductVariation[].class
+            );
+
+            if (response.getBody()   != null) {
+                log.info("Retrieved {} variations for product {}",
+                        response.getBody().length, productId);
+                return Arrays.asList(response.getBody());
+            }
+            return Collections.emptyList();
+        } catch (Exception e) {
+            log.error("Error fetching variations for product {}", productId, e);
+            return Collections.emptyList();
         }
     }
 
