@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  mysql-dev:
+    image: mysql:8.0
+    container_name: 3d-printed-webapp-development
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: devpassword
+      MYSQL_DATABASE: 3d-printed-mysql
+      MYSQL_USER: 3dprinter
+      MYSQL_PASSWORD: De3DPrints!@
+    volumes:
+      - mysql_dev_data:/var/lib/mysql
+    ports:
+      - "3307:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+
+volumes:
+  mysql_dev_data:

@@ -17,15 +17,16 @@ CREATE TABLE sync_status (
 -- Customers
 CREATE TABLE customers (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    woo_commerce_id BIGINT NOT NULL,
+    woo_commerce_id BIGINT NULL,
     email VARCHAR(255) NOT NULL,
     first_name VARCHAR(100),
     last_name VARCHAR(100),
     last_synced_at TIMESTAMP NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    UNIQUE KEY uk_woo_commerce_id (woo_commerce_id),
-    INDEX idx_email (email)
+    UNIQUE KEY uk_email (email),
+    INDEX idx_email (email),
+    INDEX idx_woo_commerce_id (woo_commerce_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Orders

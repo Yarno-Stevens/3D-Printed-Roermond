@@ -1,0 +1,76 @@
+version: '3.8'
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: 3d-printed-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: changeme123
+      MYSQL_DATABASE: 3d-printed-roermond
+      MYSQL_USER: appuser
+      MYSQL_PASSWORD: changeme456
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: 3d-printed-backend
+    restart: unless-stopped
+    environment:
+      # Database
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/3d-printed-roermond?useSSL=false&serverTimezone=Europe/Amsterdam&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_USERNAME: appuser
+      SPRING_DATASOURCE_PASSWORD: changeme456
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+
+      # Server
+      SERVER_PORT: 8080
+
+      # CORS
+      CORS_ALLOWED_ORIGINS: http://localhost,http://3d-printed.local
+
+      # WooCommerce (vul je eigen keys in!)
+      WOOCOMMERCE_URL: https://snoepshop.com
+      WOOCOMMERCE_CONSUMER_KEY: ck_17fb9adf69c8e6c62090c757c1156f5cc82b302c
+      WOOCOMMERCE_CONSUMER_SECRET: cs_84391160c4703b43e231d09f706513cf3eb16ba0
+
+      # Flyway
+      SPRING_FLYWAY_ENABLED: true
+      SPRING_FLYWAY_BASELINE_ON_MIGRATE: true
+    ports:
+      - "8080:8080"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - app-network
+
+  frontend:
+    image: nginx:alpine
+    container_name: 3d-printed-frontend
+    restart: unless-stopped
+    volumes:
+      - ./frontend/dist:/usr/share/nginx/html
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - app-network
+
+volumes:
+  mysql_data:
+
+networks:
+  app-network:
+    driver: bridge

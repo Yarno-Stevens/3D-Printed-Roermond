@@ -70,6 +70,21 @@ export default function SyncDashboard () {
         }
     };
 
+    const getSyncStatusLabel = (status) => {
+        switch (status) {
+            case 'SUCCESS':
+                return 'Succesvol';
+            case 'RUNNING':
+                return 'Bezig';
+            case 'FAILED':
+                return 'Mislukt';
+            case 'PAUSED':
+                return 'Gepauzeerd';
+            default:
+                return status;
+        }
+    };
+
     const getStatusIcon = (status) => {
         switch (status) {
             case 'SUCCESS':
@@ -81,6 +96,19 @@ export default function SyncDashboard () {
             default:
                 return null;
         }
+    };
+
+    const getOrderStatusLabel = (status) => {
+        const statusLabels = {
+            'pending': 'In Afwachting',
+            'processing': 'In Behandeling',
+            'on-hold': 'In de Wacht',
+            'completed': 'Voltooid',
+            'cancelled': 'Geannuleerd',
+            'refunded': 'Terugbetaald',
+            'failed': 'Mislukt'
+        };
+        return statusLabels[status] || status;
     };
 
     const formatDate = (dateString) => {
@@ -173,7 +201,7 @@ export default function SyncDashboard () {
                             <Box display="flex" alignItems="center" gap={1}>
                                 {dashboard?.orderSync && getStatusIcon(dashboard.orderSync.status)}
                                 <Chip
-                                    label={dashboard?.orderSync?.status || 'Onbekend'}
+                                    label={getSyncStatusLabel(dashboard?.orderSync?.status) || 'Onbekend'}
                                     color={getStatusColor(dashboard?.orderSync?.status)}
                                     size="small"
                                 />
@@ -201,7 +229,7 @@ export default function SyncDashboard () {
                             <Box display="flex" alignItems="center" gap={1}>
                                 {dashboard?.customerSync && getStatusIcon(dashboard.customerSync.status)}
                                 <Chip
-                                    label={dashboard?.customerSync?.status || 'Onbekend'}
+                                    label={getSyncStatusLabel(dashboard?.customerSync?.status) || 'Onbekend'}
                                     color={getStatusColor(dashboard?.customerSync?.status)}
                                     size="small"
                                 />
@@ -245,7 +273,7 @@ export default function SyncDashboard () {
                                         <TableCell>{order.orderNumber}</TableCell>
                                         <TableCell>{order.customerName}</TableCell>
                                         <TableCell>
-                                            <Chip label={order.status} size="small"/>
+                                            <Chip label={getOrderStatusLabel(order.status)} size="small"/>
                                         </TableCell>
                                         <TableCell align="right">
                                             {formatCurrency(order.total)}
@@ -271,7 +299,7 @@ export default function SyncDashboard () {
                                 </Typography>
                                 {Object.entries(stats.ordersByStatus || {}).map(([status, count]) => (
                                     <Box key={status} display="flex" justifyContent="space-between" mb={1}>
-                                        <Typography>{status}</Typography>
+                                        <Typography>{getOrderStatusLabel(status)}</Typography>
                                         <Typography fontWeight="bold">{count}</Typography>
                                     </Box>
                                 ))}

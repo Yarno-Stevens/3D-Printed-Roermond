@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, {useState, useEffect} from 'react';
 import axios from 'axios';
 import {
     Box,
@@ -15,66 +15,65 @@ import {
     TableHead,
     TableRow,
     TablePagination,
-    Paper,
     CircularProgress,
     Alert,
-    FormControl,
-    InputLabel,
-    Select,
-    MenuItem,
     Grid,
     IconButton,
-    Tooltip
+    Tooltip,
+    Avatar
 } from '@mui/material';
 import {
     Search,
     FilterList,
     Refresh,
     Visibility,
+    Email,
+    ShoppingCart,
     GetApp
 } from '@mui/icons-material';
+import {useNavigate} from 'react-router';
+
 
 const API_BASE_URL = 'http://localhost:8080/api/admin/sync';
 
-export default function OrdersOverview() {
-    const [orders, setOrders] = useState([]);
+export default function CustomersOverview() {
+    const navigate = useNavigate();
+    const [customers, setCustomers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
     // Pagination
     const [page, setPage] = useState(0);
     const [rowsPerPage, setRowsPerPage] = useState(25);
-    const [totalOrders, setTotalOrders] = useState(0);
+    const [totalCustomers, setTotalCustomers] = useState(0);
 
     // Filters
     const [searchQuery, setSearchQuery] = useState('');
-    const [statusFilter, setStatusFilter] = useState('');
+    const [showFilters, setShowFilters] = useState(false);
     const [dateFrom, setDateFrom] = useState('');
     const [dateTo, setDateTo] = useState('');
-    const [showFilters, setShowFilters] = useState(false);
 
     useEffect(() => {
-        fetchOrders();
-    }, [page, rowsPerPage, statusFilter]);
+        fetchCustomers();
+    }, [page, rowsPerPage]);
 
-    const fetchOrders = async () => {
+    const fetchCustomers = async () => {
         setLoading(true);
         try {
             const params = {
                 page: page,
                 size: rowsPerPage,
                 search: searchQuery || undefined,
-                status: statusFilter || undefined,
                 dateFrom: dateFrom || undefined,
                 dateTo: dateTo || undefined
             };
 
-            const response = await axios.get(`${API_BASE_URL}/orders`, { params });
-            setOrders(response.data.content || response.data);
-            setTotalOrders(response.data.totalElements || response.data.length);
+            const response = await axios.get(`${API_BASE_URL}/customers`, {params});
+            setCustomers(response.data.content || response.data);
+            setTotalCustomers(response.data.totalElements || response.data.length);
             setError(null);
         } catch (err) {
-            setError('Fout bij ophalen van orders: ' + err.message);
+            setError('Fout bij ophalen van klanten: ' + err.message);
         } finally {
             setLoading(false);
         }
@@ -82,16 +81,15 @@ export default function OrdersOverview() {
 
     const handleSearch = () => {
         setPage(0);
-        fetchOrders();
+        fetchCustomers();
     };
 
     const handleClearFilters = () => {
         setSearchQuery('');
-        setStatusFilter('');
         setDateFrom('');
         setDateTo('');
         setPage(0);
-        fetchOrders();
+        fetchCustomers();
     };
 
     const handleChangePage = (event, newPage) => {
@@ -105,105 +103,50 @@ export default function OrdersOverview() {
 
     const formatDate = (dateString) => {
         if (!dateString) return '-';
-        return new Date(dateString).toLocaleString('nl-NL');
+        return new Date(dateString).toLocaleDateString('nl-NL');
     };
 
-    const formatCurrency = (amount) => {
-        return new Intl.NumberFormat('nl-NL', {
-            style: 'currency',
-            currency: 'EUR'
-        }).format(amount);
-    };
-
-    const getStatusColor = (status) => {
-        const statusColors = {
-            'pending': 'warning',
-            'processing': 'info',
-            'on-hold': 'default',
-            'completed': 'success',
-            'cancelled': 'error',
-            'refunded': 'error',
-            'failed': 'error'
-        };
-        return statusColors[status] || 'default';
-    };
-
-    const getStatusLabel = (status) => {
-        if (!status) return '-';
-
-        const statusLabels = {
-            'pending': 'In Afwachting',
-            'processing': 'In Behandeling',
-            'on-hold': 'In de Wacht',
-            'completed': 'Voltooid',
-            'cancelled': 'Geannuleerd',
-            'refunded': 'Terugbetaald',
-            'failed': 'Mislukt',
-            // Hoofdletters voor zekerheid
-            'PENDING': 'In Afwachting',
-            'PROCESSING': 'In Behandeling',
-            'ON-HOLD': 'In de Wacht',
-            'COMPLETED': 'Voltooid',
-            'CANCELLED': 'Geannuleerd',
-            'REFUNDED': 'Terugbetaald',
-            'FAILED': 'Mislukt'
-        };
-
-        // Probeer eerst exact match, dan lowercase
-        return statusLabels[status] || statusLabels[status.toLowerCase()] || status;
-    };
-
-    const exportOrders = () => {
-        window.open(`${API_BASE_URL}/orders/export?${new URLSearchParams({
-            search: searchQuery || '',
-            status: statusFilter || '',
-            dateFrom: dateFrom || '',
-            dateTo: dateTo || ''
-        })}`, '_blank');
+    const getInitials = (firstName, lastName) => {
+        const first = firstName?.charAt(0) || '';
+        const last = lastName?.charAt(0) || '';
+        return (first + last).toUpperCase() || '?';
     };
 
     return (
-        <Box sx={{ p: 3 }}>
+        <Box sx={{p: 3}}>
             <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-                <Typography variant="h4">Orders</Typography>
+                <Typography variant="h4">Klanten</Typography>
                 <Box>
                     <Button
                         variant="outlined"
-                        startIcon={<Refresh />}
-                        onClick={fetchOrders}
-                        sx={{ mr: 1 }}
+                        startIcon={<Refresh/>}
+                        onClick={fetchCustomers}
+                        sx={{mr: 1}}
                     >
                         Ververs
-                    </Button>
-                    <Button
-                        variant="outlined"
-                        startIcon={<GetApp />}
-                        onClick={exportOrders}
-                    >
-                        Exporteer
                     </Button>
                 </Box>
             </Box>
 
             {error && (
-                <Alert severity="error" sx={{ mb: 3 }}>
+                <Alert severity="error" sx={{mb: 3}}>
                     {error}
                 </Alert>
             )}
 
             {/* Search and Filters */}
-            <Card sx={{ mb: 3 }}>
+            <Card sx={{mb: 3}}>
                 <CardContent>
                     <Grid container spacing={2} alignItems="center">
                         <Grid item xs={12} md={6}>
                             <TextField
                                 fullWidth
-                                placeholder="Zoek op ordernummer, klantnaam of email..."
+                                placeholder="Zoek op naam of email..."
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
                                 onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
                                 InputProps={{
-                                    startAdornment: <Search sx={{ mr: 1, color: 'text.secondary' }} />
+                                    startAdornment: <Search sx={{mr: 1, color: 'text.secondary'}}/>
                                 }}
                             />
                         </Grid>
@@ -220,7 +163,7 @@ export default function OrdersOverview() {
                             <Button
                                 fullWidth
                                 variant="outlined"
-                                startIcon={<FilterList />}
+                                startIcon={<FilterList/>}
                                 onClick={() => setShowFilters(!showFilters)}
                             >
                                 {showFilters ? 'Verberg Filters' : 'Toon Filters'}
@@ -230,45 +173,26 @@ export default function OrdersOverview() {
                         {showFilters && (
                             <>
                                 <Grid item xs={12} md={4}>
-                                    <FormControl fullWidth sx={{ minWidth: 120 }}>
-                                        <InputLabel>Status</InputLabel>
-                                        <Select
-                                            value={statusFilter}
-                                            label="Status"
-                                            onChange={(e) => setStatusFilter(e.target.value)}
-                                        >
-                                            <MenuItem value="">Alle</MenuItem>
-                                            <MenuItem value="pending">In Afwachting</MenuItem>
-                                            <MenuItem value="processing">In Behandeling</MenuItem>
-                                            <MenuItem value="on-hold">In de Wacht</MenuItem>
-                                            <MenuItem value="completed">Voltooid</MenuItem>
-                                            <MenuItem value="cancelled">Geannuleerd</MenuItem>
-                                            <MenuItem value="refunded">Terugbetaald</MenuItem>
-                                            <MenuItem value="failed">Mislukt</MenuItem>
-                                        </Select>
-                                    </FormControl>
-                                </Grid>
-                                <Grid item xs={12} md={3}>
                                     <TextField
                                         fullWidth
                                         type="date"
-                                        label="Vanaf Datum"
+                                        label="Geregistreerd vanaf"
                                         value={dateFrom}
                                         onChange={(e) => setDateFrom(e.target.value)}
-                                        InputLabelProps={{ shrink: true }}
+                                        InputLabelProps={{shrink: true}}
                                     />
                                 </Grid>
-                                <Grid item xs={12} md={3}>
+                                <Grid item xs={12} md={4}>
                                     <TextField
                                         fullWidth
                                         type="date"
-                                        label="Tot Datum"
+                                        label="Geregistreerd tot"
                                         value={dateTo}
                                         onChange={(e) => setDateTo(e.target.value)}
-                                        InputLabelProps={{ shrink: true }}
+                                        InputLabelProps={{shrink: true}}
                                     />
                                 </Grid>
-                                <Grid item xs={12} md={2}>
+                                <Grid item xs={12} md={4}>
                                     <Button
                                         fullWidth
                                         variant="outlined"
@@ -283,12 +207,12 @@ export default function OrdersOverview() {
                 </CardContent>
             </Card>
 
-            {/* Orders Table */}
+            {/* Customers Table */}
             <Card>
                 <CardContent>
                     {loading ? (
                         <Box display="flex" justifyContent="center" p={3}>
-                            <CircularProgress />
+                            <CircularProgress/>
                         </Box>
                     ) : (
                         <>
@@ -296,70 +220,86 @@ export default function OrdersOverview() {
                                 <Table>
                                     <TableHead>
                                         <TableRow>
-                                            <TableCell>Order #</TableCell>
                                             <TableCell>Klant</TableCell>
                                             <TableCell>Email</TableCell>
-                                            <TableCell>Status</TableCell>
-                                            <TableCell align="right">Totaal</TableCell>
-                                            <TableCell>Gemaakt</TableCell>
-                                            <TableCell>Items</TableCell>
+                                            <TableCell>WooCommerce ID</TableCell>
+                                            <TableCell>Geregistreerd</TableCell>
+                                            <TableCell>Laatste Sync</TableCell>
                                             <TableCell align="center">Acties</TableCell>
                                         </TableRow>
                                     </TableHead>
                                     <TableBody>
-                                        {orders.length === 0 ? (
+                                        {customers.length === 0 ? (
                                             <TableRow>
-                                                <TableCell colSpan={8} align="center">
-                                                    <Typography color="textSecondary" sx={{ py: 3 }}>
-                                                        Geen orders gevonden
+                                                <TableCell colSpan={6} align="center">
+                                                    <Typography color="textSecondary" sx={{py: 3}}>
+                                                        Geen klanten gevonden
                                                     </Typography>
                                                 </TableCell>
                                             </TableRow>
                                         ) : (
-                                            orders.map((order) => (
-                                                <TableRow key={order.id} hover>
+                                            customers.map((customer) => (
+                                                <TableRow key={customer.id} hover>
                                                     <TableCell>
-                                                        <Typography variant="body2" fontWeight="bold">
-                                                            #{order.orderNumber}
-                                                        </Typography>
+                                                        <Box display="flex" alignItems="center" gap={2}>
+                                                            <Avatar sx={{bgcolor: 'primary.main'}}>
+                                                                {getInitials(customer.firstName, customer.lastName)}
+                                                            </Avatar>
+                                                            <Box>
+                                                                <Typography variant="body2" fontWeight="bold">
+                                                                    {customer.firstName} {customer.lastName}
+                                                                </Typography>
+                                                            </Box>
+                                                        </Box>
                                                     </TableCell>
                                                     <TableCell>
-                                                        {order.customer?.firstName} {order.customer?.lastName}
+                                                        <Box display="flex" alignItems="center" gap={1}>
+                                                            <Email fontSize="small" color="action"/>
+                                                            <Typography variant="body2">
+                                                                {customer.email}
+                                                            </Typography>
+                                                        </Box>
                                                     </TableCell>
                                                     <TableCell>
-                                                        {order.customer?.email || '-'}
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <Chip
-                                                            label={getStatusLabel(order.status)}
-                                                            color={getStatusColor(order.status)}
-                                                            size="small"
-                                                        />
-                                                    </TableCell>
-                                                    <TableCell align="right">
-                                                        <Typography variant="body2" fontWeight="bold">
-                                                            {formatCurrency(order.total)}
-                                                        </Typography>
+                                                        {customer.wooCommerceId ? (
+                                                            <Chip
+                                                                label={`#${customer.wooCommerceId}`}
+                                                                size="small"
+                                                                variant="outlined"
+                                                            />
+                                                        ) : (
+                                                            <Chip
+                                                                label="Gast"
+                                                                size="small"
+                                                                color="default"
+                                                            />
+                                                        )}
                                                     </TableCell>
                                                     <TableCell>
                                                         <Typography variant="body2">
-                                                            {formatDate(order.createdAt)}
+                                                            {formatDate(customer.createdAt)}
                                                         </Typography>
                                                     </TableCell>
                                                     <TableCell>
-                                                        <Chip
-                                                            label={`${order.items?.length || 0} items`}
-                                                            size="small"
-                                                            variant="outlined"
-                                                        />
+                                                        <Typography variant="body2" color="textSecondary">
+                                                            {formatDate(customer.lastSyncedAt)}
+                                                        </Typography>
                                                     </TableCell>
                                                     <TableCell align="center">
+                                                        <Tooltip title="Bekijk Orders">
+                                                            <IconButton
+                                                                size="small"
+                                                                onClick={() => navigate(`/customers/${customer.id}/orders`)}
+                                                            >
+                                                                <ShoppingCart fontSize="small"/>
+                                                            </IconButton>
+                                                        </Tooltip>
                                                         <Tooltip title="Bekijk Details">
                                                             <IconButton
                                                                 size="small"
-                                                                onClick={() => window.open(`/orders/${order.id}`, '_blank')}
+                                                                onClick={() => navigate(`/customers/${customer.id}`)}
                                                             >
-                                                                <Visibility fontSize="small" />
+                                                                <Visibility fontSize="small"/>
                                                             </IconButton>
                                                         </Tooltip>
                                                     </TableCell>
@@ -371,14 +311,14 @@ export default function OrdersOverview() {
                             </TableContainer>
                             <TablePagination
                                 component="div"
-                                count={totalOrders}
+                                count={totalCustomers}
                                 page={page}
                                 onPageChange={handleChangePage}
                                 rowsPerPage={rowsPerPage}
                                 onRowsPerPageChange={handleChangeRowsPerPage}
                                 rowsPerPageOptions={[10, 25, 50, 100]}
                                 labelRowsPerPage="Rijen per pagina:"
-                                labelDisplayedRows={({ from, to, count }) =>
+                                labelDisplayedRows={({from, to, count}) =>
                                     `${from}-${to} van ${count !== -1 ? count : `meer dan ${to}`}`
                                 }
                             />

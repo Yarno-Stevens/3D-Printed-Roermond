@@ -38,13 +38,13 @@ export default function Header() {
         }
     };
 
-    useEffect(() => {
-        if (window.location.pathname !== "/login") {
-            if (localStorage.getItem("jwt") == null) {
-                navigate("/login");
-            }
-        }
-    }, [navigate]);
+    // useEffect(() => {
+    //     if (window.location.pathname !== "/login") {
+    //         if (localStorage.getItem("jwt") == null) {
+    //             navigate("/login");
+    //         }
+    //     }
+    // }, [navigate]);
 
     useEffect(() => {
         function handleClickOutside(event) {
@@ -88,7 +88,7 @@ export default function Header() {
                               className="text-text-Primary text-lg font-semibold hover:text-Secondary">Bestellingen</Link>
                         <Link to="/products"
                               className="text-text-Primary text-lg font-semibold hover:text-Secondary">Producten</Link>
-                        <Link to="/clients"
+                        <Link to="/customers"
                               className="text-text-Primary text-lg font-semibold hover:text-Secondary">Klanten</Link>
                     </div>
                     <div ref={dropdownRef} className="relative flex items-center justify-end gap-2 w-20 sm:w-60">
@@ -107,7 +107,7 @@ export default function Header() {
                                 className="absolute right-0 top-full mt-2 w-50 bg-white rounded-lg shadow-lg border border-gray-200 z-10">
                                 <ul className="py-2">
                                     <li onClick={logout} className="px-4 py-2 hover:bg-gray-100 cursor-pointer">Uitloggen</li>
-                                    <li onClick={sync} className="px-4 py-2 hover:bg-gray-100 cursor-pointer">Uitloggen</li>
+                                    <li onClick={sync} className="px-4 py-2 hover:bg-gray-100 cursor-pointer">Sync</li>
                                 </ul>
                             </div>
                         )}
