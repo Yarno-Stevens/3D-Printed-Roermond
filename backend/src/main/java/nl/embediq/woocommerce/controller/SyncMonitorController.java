@@ -108,6 +108,129 @@ public class SyncMonitorController {
         return ResponseEntity.ok(dashboard);
     }
 
+    // ==================== PRODUCTS ENDPOINTS ====================
+
+    @GetMapping("/products")
+    public ResponseEntity<Page<ProductDTO>> getProducts(
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String minPrice,
+            @RequestParam(required = false) String maxPrice,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "25") int size
+    ) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
+
+        List<nl.embediq.woocommerce.entity.Product> allProducts = productRepository.findAll();
+
+        // Apply filters
+        if (search != null && !search.isEmpty()) {
+            String searchLower = search.toLowerCase();
+            allProducts = allProducts.stream()
+                    .filter(p ->
+                            p.getName().toLowerCase().contains(searchLower) ||
+                                    (p.getSku() != null && p.getSku().toLowerCase().contains(searchLower))
+                    )
+                    .collect(Collectors.toList());
+        }
+
+        if (status != null && !status.isEmpty()) {
+            allProducts = allProducts.stream()
+                    .filter(p -> p.getStatus() != null && p.getStatus().equalsIgnoreCase(status))
+                    .collect(Collectors.toList());
+        }
+
+        if (minPrice != null && !minPrice.isEmpty()) {
+            BigDecimal min = new BigDecimal(minPrice);
+            allProducts = allProducts.stream()
+                    .filter(p -> p.getPrice() != null && p.getPrice().compareTo(min) >= 0)
+                    .collect(Collectors.toList());
+        }
+
+        if (maxPrice != null && !maxPrice.isEmpty()) {
+            BigDecimal max = new BigDecimal(maxPrice);
+            allProducts = allProducts.stream()
+                    .filter(p -> p.getPrice() != null && p.getPrice().compareTo(max) <= 0)
+                    .collect(Collectors.toList());
+        }
+
+        // Convert to DTOs with pagination
+        List<ProductDTO> productDTOs = allProducts.stream()
+                .sorted((p1, p2) -> p2.getCreatedAt().compareTo(p1.getCreatedAt()))
+                .skip((long) page * size)
+                .limit(size)
+                .map(p -> {
+                    ProductDTO dto = new ProductDTO();
+                    dto.setId(p.getId());
+                    dto.setWooCommerceId(p.getWooCommerceId());
+                    dto.setName(p.getName());
+                    dto.setSku(p.getSku());
+                    dto.setPrice(p.getPrice());
+                    dto.setRegularPrice(p.getRegularPrice());
+                    dto.setSalePrice(p.getSalePrice());
+                    dto.setDescription(p.getDescription());
+                    dto.setShortDescription(p.getShortDescription());
+                    dto.setType(p.getType());
+                    dto.setStatus(p.getStatus());
+                    dto.setCreatedAt(p.getCreatedAt());
+                    dto.setLastSyncedAt(p.getLastSyncedAt());
+                    return dto;
+                })
+                .collect(Collectors.toList());
+
+        long total = allProducts.size();
+        Page<ProductDTO> productPage = new PageImpl<>(productDTOs, pageable, total);
+
+        return ResponseEntity.ok(productPage);
+    }
+
+    @GetMapping("/products/{id}")
+    public ResponseEntity<ProductDTO> getProductById(@PathVariable Long id) {
+        nl.embediq.woocommerce.entity.Product product = productRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Product niet gevonden met id: " + id));
+
+        ProductDTO dto = new ProductDTO();
+        dto.setId(product.getId());
+        dto.setWooCommerceId(product.getWooCommerceId());
+        dto.setName(product.getName());
+        dto.setSku(product.getSku());
+        dto.setPrice(product.getPrice());
+        dto.setRegularPrice(product.getRegularPrice());
+        dto.setSalePrice(product.getSalePrice());
+        dto.setDescription(product.getDescription());
+        dto.setShortDescription(product.getShortDescription());
+        dto.setType(product.getType());
+        dto.setStatus(product.getStatus());
+        dto.setCreatedAt(product.getCreatedAt());
+        dto.setLastSyncedAt(product.getLastSyncedAt());
+
+        // Map variations
+        if (product.getVariations() != null && !product.getVariations().isEmpty()) {
+            List<ProductVariationDTO> variationDTOs = product.getVariations().stream()
+                    .map(v -> {
+                        ProductVariationDTO varDTO = new ProductVariationDTO();
+                        varDTO.setId(v.getId());
+                        varDTO.setWooCommerceId(v.getWooCommerceId());
+                        varDTO.setSku(v.getSku());
+                        varDTO.setPrice(v.getPrice());
+                        varDTO.setRegularPrice(v.getRegularPrice());
+                        varDTO.setSalePrice(v.getSalePrice());
+                        varDTO.setDescription(v.getDescription());
+                        varDTO.setAttributes(v.getAttributes());
+                        varDTO.setWeight(v.getWeight());
+                        varDTO.setDimensions(v.getDimensions());
+                        varDTO.setStatus(v.getStatus());
+                        varDTO.setCreatedAt(v.getCreatedAt());
+                        varDTO.setLastSyncedAt(v.getLastSyncedAt());
+                        return varDTO;
+                    })
+                    .collect(Collectors.toList());
+            dto.setVariations(variationDTOs);
+        }
+
+        return ResponseEntity.ok(dto);
+    }
+
     // ==================== ORDERS ENDPOINTS ====================
 
     @GetMapping("/orders")

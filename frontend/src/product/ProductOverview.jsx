@@ -23,17 +23,13 @@ import {
     FormControl,
     InputLabel,
     Select,
-    MenuItem,
-    CardMedia
+    MenuItem
 } from '@mui/material';
 import {
     Search,
     FilterList,
     Refresh,
-    Visibility,
-    Edit,
-    Inventory,
-    GetApp
+    Visibility
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router';
 
@@ -52,35 +48,49 @@ export default function ProductsOverview() {
 
     // Filters
     const [searchQuery, setSearchQuery] = useState('');
-    const [categoryFilter, setCategoryFilter] = useState('');
-    const [stockFilter, setStockFilter] = useState('');
+    const [statusFilter, setStatusFilter] = useState('');
     const [showFilters, setShowFilters] = useState(false);
     const [minPrice, setMinPrice] = useState('');
     const [maxPrice, setMaxPrice] = useState('');
 
     useEffect(() => {
         fetchProducts();
-    }, [page, rowsPerPage, categoryFilter, stockFilter]);
+    }, [page, rowsPerPage]);
 
     const fetchProducts = async () => {
         setLoading(true);
         try {
             const params = {
                 page: page,
-                size: rowsPerPage,
-                search: searchQuery || undefined,
-                category: categoryFilter || undefined,
-                stockStatus: stockFilter || undefined,
-                minPrice: minPrice || undefined,
-                maxPrice: maxPrice || undefined
+                size: rowsPerPage
             };
 
+            // Only add search if it has a value
+            if (searchQuery && searchQuery.trim()) {
+                params.search = searchQuery.trim();
+            }
+
+            // Only add status filter if it has a value
+            if (statusFilter && statusFilter.trim()) {
+                params.status = statusFilter.trim();
+            }
+
+            // Only add price filters if they have values
+            if (minPrice && minPrice.trim()) {
+                params.minPrice = minPrice.trim();
+            }
+
+            if (maxPrice && maxPrice.trim()) {
+                params.maxPrice = maxPrice.trim();
+            }
+
             const response = await axios.get(`${API_BASE_URL}/products`, { params });
-            setProducts(response.data.content || response.data);
-            setTotalProducts(response.data.totalElements || response.data.length);
+            setProducts(response.data.content || []);
+            setTotalProducts(response.data.totalElements || 0);
             setError(null);
         } catch (err) {
             setError('Fout bij ophalen van producten: ' + err.message);
+            console.error('Error fetching products:', err);
         } finally {
             setLoading(false);
         }
@@ -93,12 +103,11 @@ export default function ProductsOverview() {
 
     const handleClearFilters = () => {
         setSearchQuery('');
-        setCategoryFilter('');
-        setStockFilter('');
+        setStatusFilter('');
         setMinPrice('');
         setMaxPrice('');
         setPage(0);
-        fetchProducts();
+        setTimeout(() => fetchProducts(), 0);
     };
 
     const handleChangePage = (event, newPage) => {
@@ -111,28 +120,31 @@ export default function ProductsOverview() {
     };
 
     const formatCurrency = (amount) => {
+        if (amount === null || amount === undefined) return '-';
         return new Intl.NumberFormat('nl-NL', {
             style: 'currency',
             currency: 'EUR'
         }).format(amount);
     };
 
-    const getStockStatusColor = (status) => {
+    const getStatusColor = (status) => {
         const statusColors = {
-            'instock': 'success',
-            'outofstock': 'error',
-            'onbackorder': 'warning'
+            'publish': 'success',
+            'draft': 'warning',
+            'pending': 'info',
+            'private': 'default'
         };
-        return statusColors[status] || 'default';
+        return statusColors[status?.toLowerCase()] || 'default';
     };
 
-    const getStockStatusLabel = (status) => {
+    const getStatusLabel = (status) => {
         const labels = {
-            'instock': 'Op voorraad',
-            'outofstock': 'Uitverkocht',
-            'onbackorder': 'Nabestelling'
+            'publish': 'Gepubliceerd',
+            'draft': 'Concept',
+            'pending': 'In behandeling',
+            'private': 'Privé'
         };
-        return labels[status] || status;
+        return labels[status?.toLowerCase()] || status;
     };
 
     return (
@@ -164,7 +176,7 @@ export default function ProductsOverview() {
                         <Grid item xs={12} md={6}>
                             <TextField
                                 fullWidth
-                                placeholder="Zoek op productnaam, SKU of beschrijving..."
+                                placeholder="Zoek op productnaam of SKU..."
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
                                 onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
@@ -197,36 +209,21 @@ export default function ProductsOverview() {
                             <>
                                 <Grid item xs={12} md={3}>
                                     <FormControl fullWidth>
-                                        <InputLabel>Categorie</InputLabel>
-                                        <Select
-                                            value={categoryFilter}
-                                            label="Categorie"
-                                            onChange={(e) => setCategoryFilter(e.target.value)}
+                                        <InputLabel>Status</InputLabel>
+                                        <Select className="min-w-40"
+                                            value={statusFilter}
+                                            label="Status"
+                                            onChange={(e) => setStatusFilter(e.target.value)}
                                         >
                                             <MenuItem value="">Alle</MenuItem>
-                                            <MenuItem value="electronics">Elektronica</MenuItem>
-                                            <MenuItem value="clothing">Kleding</MenuItem>
-                                            <MenuItem value="accessories">Accessoires</MenuItem>
-                                            <MenuItem value="home">Huis & Tuin</MenuItem>
+                                            <MenuItem value="publish">Gepubliceerd</MenuItem>
+                                            <MenuItem value="draft">Concept</MenuItem>
+                                            <MenuItem value="pending">In behandeling</MenuItem>
+                                            <MenuItem value="private">Privé</MenuItem>
                                         </Select>
                                     </FormControl>
                                 </Grid>
                                 <Grid item xs={12} md={3}>
-                                    <FormControl fullWidth>
-                                        <InputLabel>Voorraadstatus</InputLabel>
-                                        <Select
-                                            value={stockFilter}
-                                            label="Voorraadstatus"
-                                            onChange={(e) => setStockFilter(e.target.value)}
-                                        >
-                                            <MenuItem value="">Alle</MenuItem>
-                                            <MenuItem value="instock">Op voorraad</MenuItem>
-                                            <MenuItem value="outofstock">Uitverkocht</MenuItem>
-                                            <MenuItem value="onbackorder">Nabestelling</MenuItem>
-                                        </Select>
-                                    </FormControl>
-                                </Grid>
-                                <Grid item xs={12} md={2}>
                                     <TextField
                                         fullWidth
                                         type="number"
@@ -234,11 +231,11 @@ export default function ProductsOverview() {
                                         value={minPrice}
                                         onChange={(e) => setMinPrice(e.target.value)}
                                         InputProps={{
-                                            startAdornment: '€'
+                                            startAdornment: <Typography sx={{ mr: 1 }}>€</Typography>
                                         }}
                                     />
                                 </Grid>
-                                <Grid item xs={12} md={2}>
+                                <Grid item xs={12} md={3}>
                                     <TextField
                                         fullWidth
                                         type="number"
@@ -246,11 +243,11 @@ export default function ProductsOverview() {
                                         value={maxPrice}
                                         onChange={(e) => setMaxPrice(e.target.value)}
                                         InputProps={{
-                                            startAdornment: '€'
+                                            startAdornment: <Typography sx={{ mr: 1 }}>€</Typography>
                                         }}
                                     />
                                 </Grid>
-                                <Grid item xs={12} md={2}>
+                                <Grid item xs={12} md={3}>
                                     <Button
                                         fullWidth
                                         variant="outlined"
@@ -278,12 +275,12 @@ export default function ProductsOverview() {
                                 <Table>
                                     <TableHead>
                                         <TableRow>
-                                            <TableCell width={80}>Afbeelding</TableCell>
                                             <TableCell>Product</TableCell>
                                             <TableCell>SKU</TableCell>
+                                            <TableCell>Type</TableCell>
                                             <TableCell align="right">Prijs</TableCell>
-                                            <TableCell>Voorraad</TableCell>
-                                            <TableCell align="center">Verkocht</TableCell>
+                                            <TableCell>Status</TableCell>
+                                            <TableCell>Laatst gesynchroniseerd</TableCell>
                                             <TableCell align="center">Acties</TableCell>
                                         </TableRow>
                                     </TableHead>
@@ -300,87 +297,77 @@ export default function ProductsOverview() {
                                             products.map((product) => (
                                                 <TableRow key={product.id} hover>
                                                     <TableCell>
-                                                        <Box
-                                                            sx={{
-                                                                width: 60,
-                                                                height: 60,
-                                                                borderRadius: 1,
-                                                                overflow: 'hidden',
-                                                                bgcolor: 'grey.200',
-                                                                display: 'flex',
-                                                                alignItems: 'center',
-                                                                justifyContent: 'center'
-                                                            }}
-                                                        >
-                                                            {product.imageUrl ? (
-                                                                <CardMedia
-                                                                    component="img"
-                                                                    image={product.imageUrl}
-                                                                    alt={product.name}
-                                                                    sx={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                                                                />
-                                                            ) : (
-                                                                <Inventory color="action" />
-                                                            )}
-                                                        </Box>
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <Typography variant="body2" fontWeight="bold">
-                                                            {product.name}
-                                                        </Typography>
-                                                        {product.categories && (
-                                                            <Box mt={0.5}>
-                                                                {product.categories.slice(0, 2).map((cat, idx) => (
-                                                                    <Chip
-                                                                        key={idx}
-                                                                        label={cat}
-                                                                        size="small"
-                                                                        sx={{ mr: 0.5, fontSize: '0.7rem' }}
-                                                                    />
-                                                                ))}
+                                                        <Box display="flex" alignItems="center" gap={2}>
+                                                            <Box>
+                                                                <Typography variant="body2" fontWeight="bold">
+                                                                    {product.name}
+                                                                </Typography>
+                                                                {product.shortDescription && (
+                                                                    <Typography
+                                                                        variant="caption"
+                                                                        color="textSecondary"
+                                                                        sx={{
+                                                                            display: '-webkit-box',
+                                                                            WebkitLineClamp: 1,
+                                                                            WebkitBoxOrient: 'vertical',
+                                                                            overflow: 'hidden'
+                                                                        }}
+                                                                    >
+                                                                        {product.shortDescription.replace(/<[^>]*>/g, '')}
+                                                                    </Typography>
+                                                                )}
                                                             </Box>
-                                                        )}
+                                                        </Box>
                                                     </TableCell>
                                                     <TableCell>
                                                         <Typography variant="body2" fontFamily="monospace">
                                                             {product.sku || '-'}
                                                         </Typography>
                                                     </TableCell>
-                                                    <TableCell align="right">
-                                                        <Typography variant="body2" fontWeight="bold">
-                                                            {formatCurrency(product.price)}
-                                                        </Typography>
-                                                        {product.regularPrice !== product.price && (
-                                                            <Typography
-                                                                variant="caption"
-                                                                color="textSecondary"
-                                                                sx={{ textDecoration: 'line-through' }}
-                                                            >
-                                                                {formatCurrency(product.regularPrice)}
-                                                            </Typography>
-                                                        )}
-                                                    </TableCell>
                                                     <TableCell>
-                                                        <Box display="flex" flexDirection="column" gap={0.5}>
-                                                            <Chip
-                                                                label={getStockStatusLabel(product.stockStatus)}
-                                                                color={getStockStatusColor(product.stockStatus)}
-                                                                size="small"
-                                                            />
-                                                            {product.stockStatus === 'instock' && product.stockQuantity && (
-                                                                <Typography variant="caption" color="textSecondary">
-                                                                    {product.stockQuantity} stuks
+                                                        <Chip
+                                                            label={product.type || 'simple'}
+                                                            size="small"
+                                                            variant="outlined"
+                                                        />
+                                                    </TableCell>
+                                                    <TableCell align="right">
+                                                        <Box>
+                                                            <Typography variant="body2" fontWeight="bold">
+                                                                {formatCurrency(product.price)}
+                                                            </Typography>
+                                                            {product.salePrice && product.regularPrice &&
+                                                             product.salePrice < product.regularPrice && (
+                                                                <Typography
+                                                                    variant="caption"
+                                                                    color="textSecondary"
+                                                                    sx={{ textDecoration: 'line-through' }}
+                                                                >
+                                                                    {formatCurrency(product.regularPrice)}
                                                                 </Typography>
                                                             )}
                                                         </Box>
                                                     </TableCell>
-                                                    <TableCell align="center">
+                                                    <TableCell>
                                                         <Chip
-                                                            label={product.totalSold || 0}
+                                                            label={getStatusLabel(product.status)}
+                                                            color={getStatusColor(product.status)}
                                                             size="small"
-                                                            variant="outlined"
-                                                            color="primary"
                                                         />
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <Typography variant="body2" color="textSecondary">
+                                                            {product.lastSyncedAt ?
+                                                                new Date(product.lastSyncedAt).toLocaleString('nl-NL', {
+                                                                    day: '2-digit',
+                                                                    month: '2-digit',
+                                                                    year: 'numeric',
+                                                                    hour: '2-digit',
+                                                                    minute: '2-digit'
+                                                                }) :
+                                                                'Nooit'
+                                                            }
+                                                        </Typography>
                                                     </TableCell>
                                                     <TableCell align="center">
                                                         <Tooltip title="Bekijk Details">
@@ -389,14 +376,6 @@ export default function ProductsOverview() {
                                                                 onClick={() => navigate(`/products/${product.id}`)}
                                                             >
                                                                 <Visibility fontSize="small" />
-                                                            </IconButton>
-                                                        </Tooltip>
-                                                        <Tooltip title="Bewerk">
-                                                            <IconButton
-                                                                size="small"
-                                                                onClick={() => navigate(`/products/${product.id}/edit`)}
-                                                            >
-                                                                <Edit fontSize="small" />
                                                             </IconButton>
                                                         </Tooltip>
                                                     </TableCell>

@@ -8,6 +8,7 @@ import CustomerOverview from "./customer/CustomerOverview.jsx";
 import SyncDashboard from "./sync/SyncDashboard.jsx";
 import CustomerDetail from "./customer/CustomerDetail.jsx";
 import OrderDetail from "./order/OrderDetail.jsx";
+import ProductDetail from "./product/ProductDetail.jsx";
 
 function App() {
     return (
@@ -22,6 +23,7 @@ function App() {
                     <Route path="/sync" element={<SyncDashboard/>}/>
                     <Route path="/orders/:id" element={<OrderDetail />} />
                     <Route path="/customers/:id" element={<CustomerDetail />} />
+                    <Route path="/products/:id" element={<ProductDetail />} />
                 </Routes>
             </div>
         </>
