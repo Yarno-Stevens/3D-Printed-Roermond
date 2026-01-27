@@ -522,6 +522,38 @@ public class SyncMonitorController {
 
         dto.setItemsCount(order.getItems() != null ? order.getItems().size() : 0);
 
+        // Map order items with metadata
+        if (order.getItems() != null && !order.getItems().isEmpty()) {
+            List<OrderItemDTO> itemDTOs = order.getItems().stream()
+                    .map(item -> {
+                        OrderItemDTO itemDTO = new OrderItemDTO();
+                        itemDTO.setId(item.getId());
+                        itemDTO.setProductId(item.getProductId());
+                        itemDTO.setProductName(item.getProductName());
+                        itemDTO.setQuantity(item.getQuantity());
+                        itemDTO.setTotal(item.getTotal());
+
+                        // Parse metadata JSON
+                        if (item.getMetadata() != null && !item.getMetadata().isEmpty()) {
+                            try {
+                                com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+                                List<OrderItemMetadataDTO> metadataList = mapper.readValue(
+                                        item.getMetadata(),
+                                        mapper.getTypeFactory().constructCollectionType(List.class, OrderItemMetadataDTO.class)
+                                );
+                                itemDTO.setMetadata(metadataList);
+                            } catch (Exception e) {
+                                // If parsing fails, leave metadata empty
+                                log.warn("Failed to parse metadata for order item {}: {}", item.getId(), e.getMessage());
+                            }
+                        }
+
+                        return itemDTO;
+                    })
+                    .collect(Collectors.toList());
+            dto.setItems(itemDTOs);
+        }
+
         return dto;
     }
 

@@ -223,7 +223,7 @@ export default function OrderDetail() {
                         <Card>
                             <CardContent>
                                 <Typography variant="h6" gutterBottom>
-                                    Producten
+                                    Producten ({order.items.length})
                                 </Typography>
                                 <TableContainer>
                                     <Table>
@@ -231,7 +231,6 @@ export default function OrderDetail() {
                                             <TableRow>
                                                 <TableCell>Product</TableCell>
                                                 <TableCell align="center">Aantal</TableCell>
-                                                <TableCell align="right">Prijs</TableCell>
                                                 <TableCell align="right">Totaal</TableCell>
                                             </TableRow>
                                         </TableHead>
@@ -239,26 +238,68 @@ export default function OrderDetail() {
                                             {order.items.map((item, index) => (
                                                 <TableRow key={index}>
                                                     <TableCell>
-                                                        <Typography variant="body2" fontWeight="bold">
-                                                            {item.name}
-                                                        </Typography>
-                                                        {item.sku && (
-                                                            <Typography variant="caption" color="textSecondary">
-                                                                SKU: {item.sku}
+                                                        <Box>
+                                                            <Typography variant="body2" fontWeight="bold">
+                                                                {item.productName}
                                                             </Typography>
-                                                        )}
+
+                                                            {/* Display metadata/addons */}
+                                                            {item.metadata && item.metadata.length > 0 && (
+                                                                <Box mt={1} pl={2} sx={{
+                                                                    borderLeft: '3px solid',
+                                                                    borderColor: 'primary.light',
+                                                                    bgcolor: 'grey.50',
+                                                                    p: 1,
+                                                                    borderRadius: 1
+                                                                }}>
+                                                                    {item.metadata.map((meta, metaIndex) => (
+                                                                        <Box key={metaIndex} mb={0.5}>
+                                                                            <Typography
+                                                                                variant="caption"
+                                                                                component="div"
+                                                                                sx={{ display: 'flex', alignItems: 'center', gap: 1 }}
+                                                                            >
+                                                                                <strong>{meta.displayKey || meta.key}:</strong>
+                                                                                <Chip
+                                                                                    label={meta.displayValue || meta.value}
+                                                                                    size="small"
+                                                                                    variant="outlined"
+                                                                                    sx={{ height: 20, fontSize: '0.7rem' }}
+                                                                                />
+                                                                            </Typography>
+                                                                        </Box>
+                                                                    ))}
+                                                                </Box>
+                                                            )}
+                                                        </Box>
                                                     </TableCell>
-                                                    <TableCell align="center">{item.quantity}</TableCell>
-                                                    <TableCell align="right">
-                                                        {formatCurrency(item.price)}
+                                                    <TableCell align="center">
+                                                        <Chip
+                                                            label={`${item.quantity}x`}
+                                                            size="small"
+                                                            color="primary"
+                                                            variant="outlined"
+                                                        />
                                                     </TableCell>
                                                     <TableCell align="right">
-                                                        <Typography fontWeight="bold">
-                                                            {formatCurrency(item.price * item.quantity)}
+                                                        <Typography fontWeight="bold" variant="body1">
+                                                            {formatCurrency(item.total)}
                                                         </Typography>
                                                     </TableCell>
                                                 </TableRow>
                                             ))}
+                                            <TableRow>
+                                                <TableCell colSpan={2} align="right">
+                                                    <Typography variant="h6" fontWeight="bold">
+                                                        Totaal:
+                                                    </Typography>
+                                                </TableCell>
+                                                <TableCell align="right">
+                                                    <Typography variant="h6" fontWeight="bold" color="primary">
+                                                        {formatCurrency(order.total)}
+                                                    </Typography>
+                                                </TableCell>
+                                            </TableRow>
                                         </TableBody>
                                     </Table>
                                 </TableContainer>

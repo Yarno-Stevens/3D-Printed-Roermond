@@ -31,4 +31,7 @@ public class OrderItem {
     
     @Column(name = "total")
     private BigDecimal total;
+
+    @Column(name = "metadata", columnDefinition = "TEXT")
+    private String metadata;
 }

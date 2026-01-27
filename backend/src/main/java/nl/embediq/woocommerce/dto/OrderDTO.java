@@ -3,6 +3,8 @@ package nl.embediq.woocommerce.dto;
 import lombok.Data;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Data
 public class OrderDTO {
@@ -15,4 +17,5 @@ public class OrderDTO {
     private LocalDateTime syncedAt;
     private CustomerDTO customer;
     private Integer itemsCount;
+    private List<OrderItemDTO> items = new ArrayList<>();
 }

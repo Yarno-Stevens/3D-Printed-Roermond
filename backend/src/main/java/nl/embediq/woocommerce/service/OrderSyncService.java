@@ -1,7 +1,9 @@
 package nl.embediq.woocommerce.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.EntityManager;
 import lombok.extern.slf4j.Slf4j;
+import nl.embediq.woocommerce.dto.OrderItemMetadataDTO;
 import nl.embediq.woocommerce.dto.SyncResult;
 import nl.embediq.woocommerce.dto.WooBilling;
 import nl.embediq.woocommerce.dto.WooOrder;
@@ -26,6 +28,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -191,6 +194,58 @@ public class OrderSyncService {
                             item.setProductName(wooItem.getName());
                             item.setQuantity(wooItem.getQuantity());
                             item.setTotal(new BigDecimal(wooItem.getTotal()));
+
+                            // Map metadata including product addons
+                            if (wooItem.getMetaData() != null && !wooItem.getMetaData().isEmpty()) {
+                                try {
+                                    ObjectMapper mapper = new ObjectMapper();
+
+                                    // Filter and convert metadata to OrderItemMetadataDTO
+                                    // Only include metadata that:
+                                    // 1. Doesn't start with _ (internal WooCommerce fields)
+                                    // 2. Has a simple string or primitive value (not complex objects)
+                                    List<OrderItemMetadataDTO> metadataList = wooItem.getMetaData().stream()
+                                            .filter(meta -> {
+                                                // Skip internal keys
+                                                if (meta.getKey() == null || meta.getKey().startsWith("_")) {
+                                                    return false;
+                                                }
+                                                // Skip complex nested objects (like WCPA internal data)
+                                                if (meta.getValue() instanceof Map || meta.getValue() instanceof List) {
+                                                    return false;
+                                                }
+                                                // Skip if display_value is a complex object (Map or List)
+                                                if (meta.getDisplayValue() != null &&
+                                                    (meta.getDisplayValue() instanceof Map || meta.getDisplayValue() instanceof List)) {
+                                                    return false;
+                                                }
+                                                return true;
+                                            })
+                                            .map(meta -> {
+                                                OrderItemMetadataDTO metaDTO = new OrderItemMetadataDTO();
+                                                metaDTO.setKey(meta.getKey());
+                                                metaDTO.setDisplayKey(meta.getDisplayKey() != null ? meta.getDisplayKey() : meta.getKey());
+                                                metaDTO.setValue(meta.getValue() != null ? meta.getValue().toString() : "");
+                                                // Convert displayValue to String safely
+                                                String displayValueStr = metaDTO.getValue();
+                                                if (meta.getDisplayValue() != null) {
+                                                    displayValueStr = meta.getDisplayValue().toString();
+                                                }
+                                                metaDTO.setDisplayValue(displayValueStr);
+                                                return metaDTO;
+                                            })
+                                            .collect(Collectors.toList());
+
+                                    if (!metadataList.isEmpty()) {
+                                        String metadataJson = mapper.writeValueAsString(metadataList);
+                                        item.setMetadata(metadataJson);
+                                        log.debug("Saved {} metadata items for order item {}", metadataList.size(), wooItem.getId());
+                                    }
+                                } catch (Exception e) {
+                                    log.warn("Failed to serialize metadata for order item {}: {}", wooItem.getId(), e.getMessage());
+                                }
+                            }
+
                             return item;
                         })
                         .collect(Collectors.toList());
@@ -280,3 +335,4 @@ public class OrderSyncService {
                 });
     }
 }
+

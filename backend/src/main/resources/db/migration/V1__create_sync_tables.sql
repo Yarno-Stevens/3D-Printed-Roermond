@@ -58,6 +58,7 @@ CREATE TABLE order_items
     product_name VARCHAR(255),
     quantity     INT    NOT NULL,
     total        DECIMAL(10, 2),
+    metadata     TEXT NULL,
     INDEX        idx_order (order_id),
     INDEX        idx_product (product_id),
     FOREIGN KEY (order_id) REFERENCES orders (id) ON DELETE CASCADE
