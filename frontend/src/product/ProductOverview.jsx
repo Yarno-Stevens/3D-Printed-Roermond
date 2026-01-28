@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import React, {useState, useEffect} from 'react';
+import api from '../utils/api';
 import {
     Box,
     Card,
@@ -33,7 +33,6 @@ import {
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router';
 
-const API_BASE_URL = 'http://localhost:8080/api/admin/sync';
 
 export default function ProductsOverview() {
     const navigate = useNavigate();
@@ -84,7 +83,7 @@ export default function ProductsOverview() {
                 params.maxPrice = maxPrice.trim();
             }
 
-            const response = await axios.get(`${API_BASE_URL}/products`, { params });
+            const response = await api.get('/admin/sync/products', { params });
             setProducts(response.data.content || []);
             setTotalProducts(response.data.totalElements || 0);
             setError(null);

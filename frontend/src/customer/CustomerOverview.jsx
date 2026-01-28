@@ -1,5 +1,5 @@
-import React, {useState, useEffect} from 'react';
-import axios from 'axios';
+import React, { useState, useEffect } from 'react';
+import api from '../utils/api';
 import {
     Box,
     Card,
@@ -34,8 +34,6 @@ import {
 import {useNavigate} from 'react-router';
 
 
-const API_BASE_URL = 'http://localhost:8080/api/admin/sync';
-
 export default function CustomersOverview() {
     const navigate = useNavigate();
     const [customers, setCustomers] = useState([]);
@@ -68,7 +66,7 @@ export default function CustomersOverview() {
                 dateTo: dateTo || undefined
             };
 
-            const response = await axios.get(`${API_BASE_URL}/customers`, {params});
+            const response = await api.get('/admin/sync/customers', {params});
             setCustomers(response.data.content || response.data);
             setTotalCustomers(response.data.totalElements || response.data.length);
             setError(null);

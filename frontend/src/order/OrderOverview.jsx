@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../utils/api';
 import {
     Box,
     Card,
@@ -71,7 +71,7 @@ export default function OrdersOverview() {
                 dateTo: dateTo || undefined
             };
 
-            const response = await axios.get(`${API_BASE_URL}/orders`, { params });
+            const response = await api.get('/admin/sync/orders', { params });
             setOrders(response.data.content || response.data);
             setTotalOrders(response.data.totalElements || response.data.length);
             setError(null);

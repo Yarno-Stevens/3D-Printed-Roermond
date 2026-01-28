@@ -15,6 +15,19 @@ CREATE TABLE sync_status
     UNIQUE KEY uk_sync_type (sync_type)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Users table for authentication
+CREATE TABLE users
+(
+    id         BIGINT AUTO_INCREMENT PRIMARY KEY,
+    username   VARCHAR(50) NOT NULL UNIQUE,
+    password   VARCHAR(255) NOT NULL,
+    role       VARCHAR(20) NOT NULL DEFAULT 'ADMIN',
+    enabled    BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    last_login TIMESTAMP NULL,
+    INDEX      idx_username (username)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- Customers
 CREATE TABLE customers
 (
@@ -88,6 +101,7 @@ CREATE TABLE products
     INDEX             idx_type (type)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+
 -- Product variations
 CREATE TABLE product_variations
 (
@@ -111,3 +125,9 @@ CREATE TABLE product_variations
     INDEX           idx_product_id (product_id),
     INDEX           idx_sku (sku)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Insert default admin user (password: admin123)
+-- BCrypt hash for 'admin123' - Generated and verified to work
+INSERT INTO users (username, password, role, enabled)
+VALUES ('admin', '$2a$10$jv8ECUU2X1gZjBxCmGKCo.eCo1UFJhv4w56ycPDYf6yUO8YbcgndW', 'ADMIN', TRUE);
+

@@ -1,50 +1,14 @@
 import {FontAwesomeIcon} from "@fortawesome/react-fontawesome";
-import {faUser} from "@fortawesome/free-solid-svg-icons";
+import {faUser, faRightFromBracket} from "@fortawesome/free-solid-svg-icons";
 import React, {useEffect, useState, useRef} from "react";
 import {Link, useNavigate} from "react-router";
-import {jwtDecode} from 'jwt-decode';
 
 export default function Header() {
-
     const navigate = useNavigate();
     const dropdownRef = useRef(null);
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
-    const getPersonnelNameFromToken = () => {
-        try {
-            const token = localStorage.getItem("jwt");
-            if (!token) return null;
-
-            const decoded = jwtDecode(token);
-            const subData = JSON.parse(decoded.sub);
-            return subData.name;
-        } catch (error) {
-            console.error('Error decoding token:', error);
-            return null;
-        }
-    };
-
-    const getPersonnelAuthFromToken = () => {
-        try {
-            const token = localStorage.getItem("jwt");
-            if (!token) return null;
-
-            const decoded = jwtDecode(token);
-            const subData = JSON.parse(decoded.sub);
-            return subData.auth;
-        } catch (error) {
-            console.error('Error decoding token:', error);
-            return null;
-        }
-    };
-
-    // useEffect(() => {
-    //     if (window.location.pathname !== "/login") {
-    //         if (localStorage.getItem("jwt") == null) {
-    //             navigate("/login");
-    //         }
-    //     }
-    // }, [navigate]);
+    const username = localStorage.getItem("username");
 
     useEffect(() => {
         function handleClickOutside(event) {
@@ -63,7 +27,9 @@ export default function Header() {
     }, [isDropdownOpen]);
 
     function logout() {
-        localStorage.removeItem("jwt");
+        localStorage.removeItem("token");
+        localStorage.removeItem("username");
+        localStorage.removeItem("role");
         setIsDropdownOpen(false);
         navigate("/login");
     }
@@ -92,28 +58,36 @@ export default function Header() {
                               className="text-text-Primary text-lg font-semibold hover:text-Secondary">Klanten</Link>
                     </div>
                     <div ref={dropdownRef} className="relative flex items-center justify-end gap-2 w-20 sm:w-60">
-                        {localStorage.getItem("jwt") ? <>
-                            <p className="text-text-Primary text-right font-semibold hidden sm:block">{getPersonnelNameFromToken() ? getPersonnelNameFromToken() : ""}</p>
-                            <FontAwesomeIcon
-                                aria-label="user-icon"
-                                data-testid="user-icon"
-                                icon={faUser}
-                                className="text-Secondary text-2xl cursor-pointer"
-                                onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                            /></> : ""}
-
+                        <p className="text-text-Primary text-right font-semibold hidden sm:block">{username}</p>
+                        <FontAwesomeIcon
+                            aria-label="user-icon"
+                            data-testid="user-icon"
+                            icon={faUser}
+                            className="text-Secondary text-2xl cursor-pointer"
+                            onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                        />
                         {isDropdownOpen && (
                             <div
-                                className="absolute right-0 top-full mt-2 w-50 bg-white rounded-lg shadow-lg border border-gray-200 z-10">
-                                <ul className="py-2">
-                                    <li onClick={logout} className="px-4 py-2 hover:bg-gray-100 cursor-pointer">Uitloggen</li>
-                                    <li onClick={sync} className="px-4 py-2 hover:bg-gray-100 cursor-pointer">Sync</li>
-                                </ul>
+                                className="absolute top-full right-0 mt-2 bg-white rounded-lg shadow-lg z-50 overflow-hidden min-w-48">
+                                <button
+                                    className="block w-full text-left px-4 py-3 text-gray-800 hover:bg-gray-100 border-b border-gray-200"
+                                    onClick={sync}
+                                >
+                                    Synchroniseren
+                                </button>
+                                <button
+                                    className="flex items-center gap-2 w-full text-left px-4 py-3 text-gray-800 hover:bg-gray-100"
+                                    onClick={logout}
+                                >
+                                    <FontAwesomeIcon icon={faRightFromBracket} />
+                                    Uitloggen
+                                </button>
                             </div>
                         )}
                     </div>
                 </div>
             </div>
         </div>
-    )
+    );
 }
+

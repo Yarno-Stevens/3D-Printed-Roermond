@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router';
-import axios from 'axios';
+import api from '../utils/api';
 import {
     Box,
     Card,
@@ -34,7 +34,6 @@ import {
     Visibility
 } from '@mui/icons-material';
 
-const API_BASE_URL = 'http://localhost:8080/api/admin/sync';
 
 export default function CustomerDetail() {
     const { id } = useParams();
@@ -57,7 +56,7 @@ export default function CustomerDetail() {
     const fetchCustomerDetail = async () => {
         setLoading(true);
         try {
-            const response = await axios.get(`${API_BASE_URL}/customers/${id}`);
+            const response = await api.get(`/admin/sync/customers/${id}`);
             setCustomer(response.data);
             setError(null);
         } catch (err) {
@@ -69,7 +68,7 @@ export default function CustomerDetail() {
 
     const fetchCustomerOrders = async () => {
         try {
-            const response = await axios.get(`${API_BASE_URL}/customers/${id}/orders`);
+            const response = await api.get(`/admin/sync/customers/${id}/orders`);
             setOrders(response.data);
         } catch (err) {
             console.error('Fout bij ophalen van orders:', err);

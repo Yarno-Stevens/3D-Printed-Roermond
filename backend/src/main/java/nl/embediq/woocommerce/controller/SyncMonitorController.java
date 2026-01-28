@@ -465,6 +465,7 @@ public class SyncMonitorController {
         new Thread(() -> {
             try {
                 log.info("Starting manual sync...");
+                productSyncService.syncProducts();
                 customerSyncService.syncCustomers();
                 orderSyncService.syncOrders();
 

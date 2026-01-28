@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router';
-import axios from 'axios';
+import api from '../utils/api';
 import {
     Box,
     Card,
@@ -31,9 +31,8 @@ import {
     Receipt,
     AccessTime,
     Sync
-} from '@mui/icons-material';
+    } from '@mui/icons-material';
 
-const API_BASE_URL = 'http://localhost:8080/api/admin/sync';
 
 export default function OrderDetail() {
     const { id } = useParams();
@@ -49,7 +48,7 @@ export default function OrderDetail() {
     const fetchOrderDetail = async () => {
         setLoading(true);
         try {
-            const response = await axios.get(`${API_BASE_URL}/orders/${id}`);
+            const response = await api.get(`/admin/sync/orders/${id}`);
             setOrder(response.data);
             setError(null);
         } catch (err) {

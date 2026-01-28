@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../utils/api';
 import { useParams, useNavigate } from 'react-router';
 import {
     Box,
@@ -28,7 +28,6 @@ import {
     Sync
 } from '@mui/icons-material';
 
-const API_BASE_URL = 'http://localhost:8080/api/admin/sync';
 
 export default function ProductDetail() {
     const { id } = useParams();
@@ -44,7 +43,7 @@ export default function ProductDetail() {
     const fetchProduct = async () => {
         setLoading(true);
         try {
-            const response = await axios.get(`${API_BASE_URL}/products/${id}`);
+            const response = await api.get(`/admin/sync/products/${id}`);
             setProduct(response.data);
             setError(null);
         } catch (err) {

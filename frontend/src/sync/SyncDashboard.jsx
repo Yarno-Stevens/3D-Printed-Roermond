@@ -1,9 +1,8 @@
-import React, {useState, useEffect} from 'react';
-import axios from 'axios';
+import React, {useEffect, useState} from 'react';
+import api from '../utils/api';
 import {Box, Card, CardContent, Grid, Typography, Button, Chip, LinearProgress, Alert, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, CircularProgress} from '@mui/material';
 import {Refresh, CheckCircle, Error, PlayArrow, Pause} from '@mui/icons-material';
 
-const API_BASE_URL = 'http://localhost:8080/api/admin/sync';
 
 export default function SyncDashboard () {
     const [dashboard, setDashboard] = useState(null);
@@ -24,9 +23,9 @@ export default function SyncDashboard () {
     const fetchData = async () => {
         try {
             const [dashboardRes, ordersRes, statsRes] = await Promise.all([
-                axios.get(`${API_BASE_URL}/dashboard`),
-                axios.get(`${API_BASE_URL}/orders/recent?limit=10`),
-                axios.get(`${API_BASE_URL}/stats`)
+                api.get('/admin/sync/dashboard'),
+                api.get('/admin/sync/orders/recent?limit=10'),
+                api.get('/admin/sync/stats')
             ]);
 
             setDashboard(dashboardRes.data);
@@ -43,7 +42,7 @@ export default function SyncDashboard () {
     const triggerSync = async () => {
         setSyncing(true);
         try {
-            await axios.post(`${API_BASE_URL}/trigger`);
+            await api.post('/admin/sync/trigger');
             alert('Sync gestart! Data wordt op de achtergrond gesynchroniseerd.');
 
             // Refresh na 5 seconden
