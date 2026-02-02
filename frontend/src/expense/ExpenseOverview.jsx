@@ -36,8 +36,7 @@ import {
     Edit as EditIcon,
     Delete as DeleteIcon,
     Refresh,
-    FilterList,
-    TrendingDown
+    FilterList
 } from '@mui/icons-material';
 
 export default function ExpensesOverview() {
@@ -79,12 +78,26 @@ export default function ExpensesOverview() {
         severity: 'success' // 'success' | 'error' | 'warning' | 'info'
     });
 
+    // Confirmation dialog state
+    const [confirmDialog, setConfirmDialog] = useState({
+        open: false,
+        expenseId: null
+    });
+
     useEffect(() => {
         fetchExpenses();
         fetchCategories();
         fetchSuppliers();
         fetchStats();
     }, [page, rowsPerPage, categoryFilter, supplierFilter]);
+
+    const showMessage = (message, severity = 'success') => {
+        setSnackbar({ open: true, message, severity });
+    };
+
+    const handleCloseSnackbar = () => {
+        setSnackbar({ ...snackbar, open: false });
+    };
 
     const fetchExpenses = async () => {
         setLoading(true);
@@ -167,7 +180,7 @@ export default function ExpensesOverview() {
 
     const handleSubmit = async () => {
         if (!description || !amount || !category) {
-            alert('Vul minimaal omschrijving, bedrag en categorie in');
+            showMessage('Vul minimaal omschrijving, bedrag en categorie in', 'warning');
             return;
         }
 
@@ -183,10 +196,10 @@ export default function ExpensesOverview() {
 
             if (editingExpense) {
                 await api.put(`/admin/sync/expenses/${editingExpense.id}`, data);
-                alert('Uitgave bijgewerkt!');
+                showMessage('Uitgave bijgewerkt!', 'success');
             } else {
                 await api.post('/admin/sync/expenses', data);
-                alert('Uitgave toegevoegd!');
+                showMessage('Uitgave toegevoegd!', 'success');
             }
 
             handleCloseModal();
@@ -196,24 +209,31 @@ export default function ExpensesOverview() {
             fetchStats();
         } catch (error) {
             console.error('Failed to save expense:', error);
-            alert('Fout bij opslaan: ' + (error.response?.data?.error || error.message));
+            showMessage('Fout bij opslaan: ' + (error.response?.data?.error || error.message), 'error');
         }
     };
 
     const handleDelete = async (id) => {
-        if (!confirm('Weet je zeker dat je deze uitgave wilt verwijderen?')) {
-            return;
-        }
+        setConfirmDialog({ open: true, expenseId: id });
+    };
+
+    const handleConfirmDelete = async () => {
+        const id = confirmDialog.expenseId;
+        setConfirmDialog({ open: false, expenseId: null });
 
         try {
             await api.delete(`/admin/sync/expenses/${id}`);
-            alert('Uitgave verwijderd!');
+            showMessage('Uitgave verwijderd!', 'success');
             fetchExpenses();
             fetchStats();
         } catch (error) {
             console.error('Failed to delete expense:', error);
-            alert('Fout bij verwijderen: ' + (error.response?.data?.error || error.message));
+            showMessage('Fout bij verwijderen: ' + (error.response?.data?.error || error.message), 'error');
         }
+    };
+
+    const handleCancelDelete = () => {
+        setConfirmDialog({ open: false, expenseId: null });
     };
 
     const formatCurrency = (amount) => {
@@ -318,6 +338,7 @@ export default function ExpensesOverview() {
                                     <Select
                                         value={categoryFilter}
                                         label="Categorie"
+                                        variant="outlined"
                                         onChange={(e) => setCategoryFilter(e.target.value)}
                                     >
                                         <MenuItem value="">Alle</MenuItem>
@@ -332,6 +353,7 @@ export default function ExpensesOverview() {
                                     <Select
                                         value={supplierFilter}
                                         label="Leverancier"
+                                        variant="outlined"
                                         onChange={(e) => setSupplierFilter(e.target.value)}
                                     >
                                         <MenuItem value="">Alle</MenuItem>
@@ -492,6 +514,7 @@ export default function ExpensesOverview() {
                             <Select
                                 value={category}
                                 label="Categorie *"
+                                variant="outlined"
                                 onChange={(e) => setCategory(e.target.value)}
                             >
                                 <MenuItem value="Materialen">Materialen</MenuItem>
@@ -537,6 +560,46 @@ export default function ExpensesOverview() {
                     </Button>
                 </DialogActions>
             </Dialog>
+
+            {/* Confirmation Dialog */}
+            <Dialog
+                open={confirmDialog.open}
+                onClose={handleCancelDelete}
+                maxWidth="xs"
+                fullWidth
+            >
+                <DialogTitle>Uitgave Verwijderen</DialogTitle>
+                <DialogContent>
+                    <Typography>
+                        Weet je zeker dat je deze uitgave wilt verwijderen? Deze actie kan niet ongedaan worden gemaakt.
+                    </Typography>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={handleCancelDelete}>
+                        Annuleren
+                    </Button>
+                    <Button onClick={handleConfirmDelete} color="error" variant="contained">
+                        Verwijderen
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* Snackbar for notifications */}
+            <Snackbar
+                open={snackbar.open}
+                autoHideDuration={4000}
+                onClose={handleCloseSnackbar}
+                anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+            >
+                <Alert
+                    onClose={handleCloseSnackbar}
+                    severity={snackbar.severity}
+                    variant="filled"
+                    sx={{ width: '100%' }}
+                >
+                    {snackbar.message}
+                </Alert>
+            </Snackbar>
         </Box>
     );
 }

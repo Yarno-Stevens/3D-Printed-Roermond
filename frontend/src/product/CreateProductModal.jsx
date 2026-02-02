@@ -18,7 +18,9 @@ import {
     Paper,
     InputAdornment,
     Chip,
-    Divider
+    Divider,
+    Snackbar,
+    Alert
 } from '@mui/material';
 import {
     Add as AddIcon,
@@ -29,6 +31,7 @@ import {
 import api from '../utils/api';
 
 export default function CreateProductModal({ open, onClose, onSuccess }) {
+    const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
     // Product basic info
     const [productName, setProductName] = useState('');
     const [productSku, setProductSku] = useState('');
@@ -48,9 +51,17 @@ export default function CreateProductModal({ open, onClose, onSuccess }) {
 
     const [loading, setLoading] = useState(false);
 
+    const showMessage = (message, severity = 'success') => {
+        setSnackbar({ open: true, message, severity });
+    };
+
+    const handleCloseSnackbar = () => {
+        setSnackbar({ ...snackbar, open: false });
+    };
+
     const addVariation = () => {
         if (!varAttributeName || !varAttributeValue || !varPrice) {
-            alert('Vul minimaal attribute naam, waarde en prijs in');
+            showMessage('Vul minimaal attribute naam, waarde en prijs in', 'warning');
             return;
         }
 
@@ -83,7 +94,7 @@ export default function CreateProductModal({ open, onClose, onSuccess }) {
 
     const handleSubmit = async () => {
         if (!productName || !productPrice) {
-            alert('Vul minimaal productnaam en prijs in');
+            showMessage('Vul minimaal productnaam en prijs in', 'warning');
             return;
         }
 
@@ -100,12 +111,12 @@ export default function CreateProductModal({ open, onClose, onSuccess }) {
 
             const response = await api.post('/admin/sync/products/create', requestData);
 
-            alert(`Product "${productName}" succesvol aangemaakt!${variations.length > 0 ? `\nMet ${variations.length} variatie(s)` : ''}`);
+            showMessage(`Product "${productName}" succesvol aangemaakt!${variations.length > 0 ? ` Met ${variations.length} variatie(s)` : ''}`, 'success');
             onSuccess();
             handleClose();
         } catch (error) {
             console.error('Failed to create product:', error);
-            alert('Fout bij aanmaken product: ' + (error.response?.data?.error || error.message));
+            showMessage('Fout bij aanmaken product: ' + (error.response?.data?.error || error.message), 'error');
         } finally {
             setLoading(false);
         }
@@ -343,6 +354,22 @@ export default function CreateProductModal({ open, onClose, onSuccess }) {
                     {loading ? 'Bezig...' : 'Product Aanmaken'}
                 </Button>
             </DialogActions>
+
+            <Snackbar
+                open={snackbar.open}
+                autoHideDuration={4000}
+                onClose={handleCloseSnackbar}
+                anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+            >
+                <Alert
+                    onClose={handleCloseSnackbar}
+                    severity={snackbar.severity}
+                    variant="filled"
+                    sx={{ width: '100%' }}
+                >
+                    {snackbar.message}
+                </Alert>
+            </Snackbar>
         </Dialog>
     );
 }

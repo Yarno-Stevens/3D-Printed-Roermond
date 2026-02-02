@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../utils/api';
+import { useSnackbar } from '../utils/useSnackbar';
 import CreateOrderModal from './CreateOrderModal';
 import {
     Box,
@@ -25,7 +26,8 @@ import {
     MenuItem,
     Grid,
     IconButton,
-    Tooltip
+    Tooltip,
+    Snackbar
 } from '@mui/material';
 import {
     Search,
@@ -41,6 +43,7 @@ const API_BASE_URL = 'http://localhost:8080/api/admin/sync';
 
 export default function OrdersOverview() {
     const navigate = useNavigate();
+    const { snackbar, showError, handleClose } = useSnackbar();
     const [orders, setOrders] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -121,7 +124,7 @@ export default function OrdersOverview() {
 
         } catch (error) {
             console.error('Failed to update order status:', error);
-            alert('Fout bij wijzigen status: ' + (error.response?.data?.error || error.message));
+            showError('Fout bij wijzigen status: ' + (error.response?.data?.error || error.message));
             // Refresh to show correct state
             fetchOrders();
         }
@@ -429,6 +432,22 @@ export default function OrdersOverview() {
                     )}
                 </CardContent>
             </Card>
+
+            <Snackbar
+                open={snackbar.open}
+                autoHideDuration={4000}
+                onClose={handleClose}
+                anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+            >
+                <Alert
+                    onClose={handleClose}
+                    severity={snackbar.severity}
+                    variant="filled"
+                    sx={{ width: '100%' }}
+                >
+                    {snackbar.message}
+                </Alert>
+            </Snackbar>
         </Box>
     );
 }

@@ -95,16 +95,15 @@ public class SyncMonitorController {
         long totalOrders = orderRepository.count();
         long totalCustomers = customerRepository.count();
         long totalProducts = productRepository.count();
-        long ordersSyncedToday = orderRepository.countSyncedSince(
-                LocalDateTime.now().minusDays(1)
-        );
-        long customersSyncedToday = customerRepository.countSyncedSince(
-                LocalDateTime.now().minusDays(1)
-        );
-        long productsSyncedToday = productRepository.countSyncedSince(
-                LocalDateTime.now().minusDays(1)
-        );
 
+        // Count items created in last 24 hours
+        LocalDateTime last24Hours = LocalDateTime.now().minusDays(1);
+
+        long ordersSyncedToday = orderRepository.countSyncedSince(last24Hours);
+        long customersSyncedToday = customerRepository.countSyncedSince(last24Hours);
+        long productsSyncedToday = productRepository.countSyncedSince(last24Hours);
+
+        log.info("Counting since: {}, Orders last 24h: {}", last24Hours, ordersSyncedToday);
 
         SyncDashboard dashboard = new SyncDashboard();
         dashboard.setOrderSync(orderSync);

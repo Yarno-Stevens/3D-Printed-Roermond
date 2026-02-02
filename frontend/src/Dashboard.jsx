@@ -35,8 +35,8 @@ import {
     Assessment
 } from '@mui/icons-material';
 import {
-    BarChart,
-    Bar,
+    LineChart,
+    Line,
     XAxis,
     YAxis,
     CartesianGrid,
@@ -232,7 +232,7 @@ export default function Dashboard() {
                                         +{syncDashboard?.productsSyncedToday || 0} vandaag
                                     </Typography>
                                 </Box>
-                                <Inventory sx={{ fontSize: 60, color: 'secondary.main', opacity: 0.3 }} />
+                                <Inventory sx={{ fontSize: 60, color: 'primary.main', opacity: 0.3 }} />
                             </Box>
                         </CardContent>
                     </Card>
@@ -253,89 +253,7 @@ export default function Dashboard() {
                                         +{syncDashboard?.customersSyncedToday || 0} vandaag
                                     </Typography>
                                 </Box>
-                                <People sx={{ fontSize: 60, color: 'info.main', opacity: 0.3 }} />
-                            </Box>
-                        </CardContent>
-                    </Card>
-                </Grid>
-
-                <Grid item xs={12} sm={6} md={3}>
-                    <Card sx={{ height: '100%', minHeight: 160 }}>
-                        <CardContent sx={{ p: 3 }}>
-                            <Box display="flex" justifyContent="space-between" alignItems="flex-start" height="100%">
-                                <Box>
-                                    <Typography color="textSecondary" gutterBottom variant="body1" fontWeight={500}>
-                                        Uitgaven
-                                    </Typography>
-                                    <Typography variant="h3" fontWeight="bold" color="error" my={1}>
-                                        {formatCurrency(totalExpenses)}
-                                    </Typography>
-                                    <Typography variant="body2" color="textSecondary" fontWeight={500}>
-                                        {expenseStats?.expenseCount || 0} items
-                                    </Typography>
-                                </Box>
-                                <TrendingDown sx={{ fontSize: 60, color: 'error.main', opacity: 0.3 }} />
-                            </Box>
-                        </CardContent>
-                    </Card>
-                </Grid>
-            </Grid>
-
-            {/* Financial Overview */}
-            <Grid container spacing={3} mb={3}>
-                <Grid item xs={12} md={4}>
-                    <Card sx={{ bgcolor: 'success.light', color: 'success.contrastText', minHeight: 140 }}>
-                        <CardContent sx={{ p: 3 }}>
-                            <Box display="flex" alignItems="center" gap={2}>
-                                <TrendingUp sx={{ fontSize: 50 }} />
-                                <Box>
-                                    <Typography variant="body1" fontWeight={500} mb={1}>
-                                        Totale Omzet
-                                    </Typography>
-                                    <Typography variant="h4" fontWeight="bold">
-                                        {formatCurrency(totalRevenue)}
-                                    </Typography>
-                                </Box>
-                            </Box>
-                        </CardContent>
-                    </Card>
-                </Grid>
-
-                <Grid item xs={12} md={4}>
-                    <Card sx={{ bgcolor: 'error.light', color: 'error.contrastText', minHeight: 140 }}>
-                        <CardContent sx={{ p: 3 }}>
-                            <Box display="flex" alignItems="center" gap={2}>
-                                <TrendingDown sx={{ fontSize: 50 }} />
-                                <Box>
-                                    <Typography variant="body1" fontWeight={500} mb={1}>
-                                        Totale Uitgaven
-                                    </Typography>
-                                    <Typography variant="h4" fontWeight="bold">
-                                        {formatCurrency(totalExpenses)}
-                                    </Typography>
-                                </Box>
-                            </Box>
-                        </CardContent>
-                    </Card>
-                </Grid>
-
-                <Grid item xs={12} md={4}>
-                    <Card sx={{
-                        bgcolor: profit >= 0 ? 'primary.main' : 'warning.main',
-                        color: 'white',
-                        minHeight: 140
-                    }}>
-                        <CardContent sx={{ p: 3 }}>
-                            <Box display="flex" alignItems="center" gap={2}>
-                                <AttachMoney sx={{ fontSize: 50 }} />
-                                <Box>
-                                    <Typography variant="body1" fontWeight={500} mb={1}>
-                                        Winst/Verlies
-                                    </Typography>
-                                    <Typography variant="h4" fontWeight="bold">
-                                        {formatCurrency(profit)}
-                                    </Typography>
-                                </Box>
+                                <People sx={{ fontSize: 60, color: 'primary.main', opacity: 0.3 }} />
                             </Box>
                         </CardContent>
                     </Card>
@@ -402,7 +320,7 @@ export default function Dashboard() {
 
                                 {/* Revenue Stats Summary */}
                                 <Grid container spacing={2} mb={3}>
-                                    <Grid item xs={12} md={4}>
+                                    <Grid item xs={12} md={3}>
                                         <Paper variant="outlined" sx={{ p: 3, minHeight: 120 }}>
                                             <Typography variant="body1" color="textSecondary" fontWeight={500} mb={1}>
                                                 Totale Omzet
@@ -412,17 +330,27 @@ export default function Dashboard() {
                                             </Typography>
                                         </Paper>
                                     </Grid>
-                                    <Grid item xs={12} md={4}>
+                                    <Grid item xs={12} md={3}>
                                         <Paper variant="outlined" sx={{ p: 3, minHeight: 120 }}>
                                             <Typography variant="body1" color="textSecondary" fontWeight={500} mb={1}>
-                                                Aantal Orders
+                                                Totale Uitgaven
                                             </Typography>
-                                            <Typography variant="h4" color="primary.main" fontWeight="bold">
-                                                {revenueStats.orderCount}
+                                            <Typography variant="h4" color="error.main" fontWeight="bold">
+                                                {formatCurrency(revenueStats.totalExpenses || 0)}
                                             </Typography>
                                         </Paper>
                                     </Grid>
-                                    <Grid item xs={12} md={4}>
+                                    <Grid item xs={12} md={3}>
+                                        <Paper variant="outlined" sx={{ p: 3, minHeight: 120 }}>
+                                            <Typography variant="body1" color="textSecondary" fontWeight={500} mb={1}>
+                                                Totale Winst
+                                            </Typography>
+                                            <Typography variant="h4" color="primary.main" fontWeight="bold">
+                                                {formatCurrency(revenueStats.totalProfit || 0)}
+                                            </Typography>
+                                        </Paper>
+                                    </Grid>
+                                    <Grid item xs={12} md={3}>
                                         <Paper variant="outlined" sx={{ p: 3, minHeight: 120 }}>
                                             <Typography variant="body1" color="textSecondary" fontWeight={500} mb={1}>
                                                 Gem. Order Waarde
@@ -434,12 +362,14 @@ export default function Dashboard() {
                                     </Grid>
                                 </Grid>
 
-                                {/* Revenue Chart */}
+                                {/* Revenue, Expenses & Profit Chart */}
                                 <ResponsiveContainer width="100%" height={500}>
-                                    <BarChart
-                                        data={Object.entries(revenueStats.revenueByPeriod || {}).map(([period, revenue]) => ({
+                                    <LineChart
+                                        data={Object.keys(revenueStats.revenueByPeriod || {}).map(period => ({
                                             period,
-                                            revenue: parseFloat(revenue)
+                                            revenue: parseFloat(revenueStats.revenueByPeriod[period] || 0),
+                                            expenses: parseFloat(revenueStats.expensesByPeriod?.[period] || 0),
+                                            profit: parseFloat(revenueStats.profitByPeriod?.[period] || 0)
                                         }))}
                                         margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
                                     >
@@ -454,12 +384,38 @@ export default function Dashboard() {
                                             tickFormatter={(value) => `€${value}`}
                                         />
                                         <Tooltip
-                                            formatter={(value) => [`€${value.toFixed(2)}`, 'Omzet']}
+                                            formatter={(value) => [`€${value.toFixed(2)}`]}
                                             labelStyle={{ color: '#000' }}
                                         />
                                         <Legend />
-                                        <Bar dataKey="revenue" fill="#82ca9d" name="Omzet (€)" />
-                                    </BarChart>
+                                        <Line
+                                            type="monotone"
+                                            dataKey="revenue"
+                                            stroke="#82ca9d"
+                                            strokeWidth={2}
+                                            name="Omzet (€)"
+                                            dot={{ r: 4 }}
+                                            activeDot={{ r: 6 }}
+                                        />
+                                        <Line
+                                            type="monotone"
+                                            dataKey="expenses"
+                                            stroke="#ff6b6b"
+                                            strokeWidth={2}
+                                            name="Uitgaven (€)"
+                                            dot={{ r: 4 }}
+                                            activeDot={{ r: 6 }}
+                                        />
+                                        <Line
+                                            type="monotone"
+                                            dataKey="profit"
+                                            stroke="#4dabf7"
+                                            strokeWidth={2}
+                                            name="Winst (€)"
+                                            dot={{ r: 4 }}
+                                            activeDot={{ r: 6 }}
+                                        />
+                                    </LineChart>
                                 </ResponsiveContainer>
                             </CardContent>
                         </Card>

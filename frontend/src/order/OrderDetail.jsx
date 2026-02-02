@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router';
 import api from '../utils/api';
+import { useSnackbar } from '../utils/useSnackbar';
 import {
     Box,
     Card,
@@ -19,7 +20,8 @@ import {
     Paper,
     CircularProgress,
     Alert,
-    IconButton
+    IconButton,
+    Snackbar
 } from '@mui/material';
 import {
     ArrowBack,
@@ -39,6 +41,7 @@ import {
 export default function OrderDetail() {
     const { id } = useParams();
     const navigate = useNavigate();
+    const { snackbar, showError, handleClose: handleCloseSnackbar } = useSnackbar();
     const [order, setOrder] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -78,7 +81,7 @@ export default function OrderDetail() {
             window.URL.revokeObjectURL(url);
         } catch (error) {
             console.error('Failed to download PDF:', error);
-            alert('Fout bij downloaden PDF: ' + (error.response?.data?.error || error.message));
+            showError('Fout bij downloaden PDF: ' + (error.response?.data?.error || error.message));
         }
     };
 
@@ -409,6 +412,22 @@ export default function OrderDetail() {
                     )}
                 </Grid>
             </Grid>
+
+            <Snackbar
+                open={snackbar.open}
+                autoHideDuration={4000}
+                onClose={handleCloseSnackbar}
+                anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+            >
+                <Alert
+                    onClose={handleCloseSnackbar}
+                    severity={snackbar.severity}
+                    variant="filled"
+                    sx={{ width: '100%' }}
+                >
+                    {snackbar.message}
+                </Alert>
+            </Snackbar>
         </Box>
     );
 }

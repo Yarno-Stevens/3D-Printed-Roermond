@@ -27,6 +27,9 @@ public class DashboardService {
     @Autowired
     private CustomerRepository customerRepository;
 
+    @Autowired
+    private nl.embediq.woocommerce.repository.ExpenseRepository expenseRepository;
+
     /**
      * Get revenue statistics for dashboard with proper filtering
      */
@@ -116,6 +119,21 @@ public class DashboardService {
         // Group revenue by period
         Map<String, BigDecimal> revenueByPeriod = groupRevenueByPeriod(filteredOrders, groupBy, year);
 
+        // Group expenses by period
+        Map<String, BigDecimal> expensesByPeriod = groupExpensesByPeriod(groupBy, year, startDate, endDate);
+
+        // Calculate total expenses
+        BigDecimal totalExpenses = expensesByPeriod.values().stream()
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        // Calculate profit by period
+        Map<String, BigDecimal> profitByPeriod = new LinkedHashMap<>();
+        for (String period : revenueByPeriod.keySet()) {
+            BigDecimal revenue = revenueByPeriod.getOrDefault(period, BigDecimal.ZERO);
+            BigDecimal expense = expensesByPeriod.getOrDefault(period, BigDecimal.ZERO);
+            profitByPeriod.put(period, revenue.subtract(expense));
+        }
+
         // Get available years
         List<Integer> availableYears = allOrders.stream()
                 .map(o -> o.getCreatedAt().getYear())
@@ -132,9 +150,13 @@ public class DashboardService {
         // Build response
         Map<String, Object> result = new HashMap<>();
         result.put("totalRevenue", totalRevenue);
+        result.put("totalExpenses", totalExpenses);
+        result.put("totalProfit", totalRevenue.subtract(totalExpenses));
         result.put("orderCount", orderCount);
         result.put("avgOrderValue", avgOrderValue);
         result.put("revenueByPeriod", revenueByPeriod);
+        result.put("expensesByPeriod", expensesByPeriod);
+        result.put("profitByPeriod", profitByPeriod);
         result.put("year", year);
         result.put("groupBy", groupBy);
         result.put("week", week);
@@ -235,6 +257,91 @@ public class DashboardService {
                             .reduce(BigDecimal.ZERO, BigDecimal::add);
 
                     result.put(String.valueOf(y), yearRevenue);
+                }
+                break;
+        }
+
+        return result;
+    }
+
+    /**
+     * Group expenses by time period
+     */
+    private Map<String, BigDecimal> groupExpensesByPeriod(String groupBy, Integer year, LocalDateTime startDate, LocalDateTime endDate) {
+        Map<String, BigDecimal> result = new LinkedHashMap<>();
+
+        // Get all expenses in date range
+        List<nl.embediq.woocommerce.entity.Expense> expenses = expenseRepository.findAll().stream()
+                .filter(e -> e.getExpenseDate() != null)
+                .filter(e -> !e.getExpenseDate().isBefore(startDate) && !e.getExpenseDate().isAfter(endDate))
+                .collect(Collectors.toList());
+
+        log.info("Found {} expenses in date range {}-{}", expenses.size(), startDate, endDate);
+
+        switch (groupBy.toLowerCase()) {
+            case "week":
+                // All 52 weeks of the year
+                LocalDate firstDayOfYear = LocalDate.of(year, 1, 1);
+                LocalDate lastDayOfYear = LocalDate.of(year, 12, 31);
+                int weeksInYear = (int) ChronoUnit.WEEKS.between(firstDayOfYear, lastDayOfYear) + 1;
+
+                for (int weekNum = 1; weekNum <= Math.min(weeksInYear, 53); weekNum++) {
+                    LocalDate weekStart = firstDayOfYear.plusWeeks(weekNum - 1);
+                    LocalDate weekEnd = weekStart.plusDays(6);
+
+                    if (weekEnd.getYear() > year) {
+                        weekEnd = lastDayOfYear;
+                    }
+
+                    LocalDateTime weekStartTime = weekStart.atStartOfDay();
+                    LocalDateTime weekEndTime = weekEnd.atTime(23, 59, 59);
+
+                    BigDecimal weekExpense = expenses.stream()
+                            .filter(e -> !e.getExpenseDate().isBefore(weekStartTime) && !e.getExpenseDate().isAfter(weekEndTime))
+                            .map(nl.embediq.woocommerce.entity.Expense::getAmount)
+                            .filter(Objects::nonNull)
+                            .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+                    result.put("Week " + weekNum, weekExpense);
+                }
+                break;
+
+            case "month":
+                // All 12 months of the year
+                String[] monthNames = {"Jan", "Feb", "Mrt", "Apr", "Mei", "Jun",
+                        "Jul", "Aug", "Sep", "Okt", "Nov", "Dec"};
+
+                for (int month = 1; month <= 12; month++) {
+                    LocalDate monthDate = LocalDate.of(year, month, 1);
+                    LocalDateTime monthStart = monthDate.atStartOfDay();
+                    LocalDateTime monthEnd = monthDate.withDayOfMonth(monthDate.lengthOfMonth()).atTime(23, 59, 59);
+
+                    BigDecimal monthExpense = expenses.stream()
+                            .filter(e -> !e.getExpenseDate().isBefore(monthStart) && !e.getExpenseDate().isAfter(monthEnd))
+                            .map(nl.embediq.woocommerce.entity.Expense::getAmount)
+                            .filter(Objects::nonNull)
+                            .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+                    result.put(monthNames[month - 1], monthExpense);
+                }
+                break;
+
+            case "year":
+                // Last 5 years
+                int currentYear = LocalDate.now().getYear();
+                for (int i = 4; i >= 0; i--) {
+                    int y = currentYear - i;
+                    LocalDateTime yearStart = LocalDateTime.of(y, 1, 1, 0, 0);
+                    LocalDateTime yearEnd = LocalDateTime.of(y, 12, 31, 23, 59, 59);
+
+                    BigDecimal yearExpense = expenseRepository.findAll().stream()
+                            .filter(e -> e.getExpenseDate() != null)
+                            .filter(e -> !e.getExpenseDate().isBefore(yearStart) && !e.getExpenseDate().isAfter(yearEnd))
+                            .map(nl.embediq.woocommerce.entity.Expense::getAmount)
+                            .filter(Objects::nonNull)
+                            .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+                    result.put(String.valueOf(y), yearExpense);
                 }
                 break;
         }

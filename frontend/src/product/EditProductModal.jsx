@@ -19,7 +19,8 @@ import {
     InputAdornment,
     Chip,
     Divider,
-    Alert
+    Alert,
+    Snackbar
 } from '@mui/material';
 import {
     Add as AddIcon,
@@ -30,6 +31,9 @@ import {
 import api from '../utils/api';
 
 export default function EditProductModal({ open, onClose, onSuccess, productId }) {
+    const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
+    const [confirmDialog, setConfirmDialog] = useState({ open: false, variationId: null });
+
     // Product basic info
     const [productName, setProductName] = useState('');
     const [productSku, setProductSku] = useState('');
@@ -53,6 +57,14 @@ export default function EditProductModal({ open, onClose, onSuccess, productId }
     const [loading, setLoading] = useState(false);
     const [loadingProduct, setLoadingProduct] = useState(false);
 
+    const showMessage = (message, severity = 'success') => {
+        setSnackbar({ open: true, message, severity });
+    };
+
+    const handleCloseSnackbar = () => {
+        setSnackbar({ ...snackbar, open: false });
+    };
+
     useEffect(() => {
         if (open && productId) {
             loadProduct();
@@ -73,7 +85,7 @@ export default function EditProductModal({ open, onClose, onSuccess, productId }
             setExistingVariations(product.variations || []);
         } catch (error) {
             console.error('Failed to load product:', error);
-            alert('Fout bij laden product: ' + (error.response?.data?.error || error.message));
+            showMessage('Fout bij laden product: ' + (error.response?.data?.error || error.message), 'error');
         } finally {
             setLoadingProduct(false);
         }
@@ -81,7 +93,7 @@ export default function EditProductModal({ open, onClose, onSuccess, productId }
 
     const addVariation = () => {
         if (!varAttributeName || !varAttributeValue || !varPrice) {
-            alert('Vul minimaal attribute naam, waarde en prijs in');
+            showMessage('Vul minimaal attribute naam, waarde en prijs in', 'warning');
             return;
         }
 
@@ -113,18 +125,25 @@ export default function EditProductModal({ open, onClose, onSuccess, productId }
     };
 
     const deleteExistingVariation = async (variationId) => {
-        if (!confirm('Weet je zeker dat je deze variatie wilt verwijderen?')) {
-            return;
-        }
+        setConfirmDialog({ open: true, variationId });
+    };
+
+    const handleConfirmDelete = async () => {
+        const variationId = confirmDialog.variationId;
+        setConfirmDialog({ open: false, variationId: null });
 
         try {
             await api.delete(`/admin/sync/products/${productId}/variations/${variationId}`);
             setExistingVariations(existingVariations.filter(v => v.id !== variationId));
-            alert('Variatie verwijderd!');
+            showMessage('Variatie verwijderd!', 'success');
         } catch (error) {
             console.error('Failed to delete variation:', error);
-            alert('Fout bij verwijderen variatie: ' + (error.response?.data?.error || error.message));
+            showMessage('Fout bij verwijderen variatie: ' + (error.response?.data?.error || error.message), 'error');
         }
+    };
+
+    const handleCancelDelete = () => {
+        setConfirmDialog({ open: false, variationId: null });
     };
 
     const parseAttributes = (attributesJson) => {
@@ -139,7 +158,7 @@ export default function EditProductModal({ open, onClose, onSuccess, productId }
 
     const handleSubmit = async () => {
         if (!productName || !productPrice) {
-            alert('Vul minimaal productnaam en prijs in');
+            showMessage('Vul minimaal productnaam en prijs in', 'warning');
             return;
         }
 
@@ -161,12 +180,12 @@ export default function EditProductModal({ open, onClose, onSuccess, productId }
                 await api.post(`/admin/sync/products/${productId}/variations`, variation);
             }
 
-            alert(`Product "${productName}" succesvol bijgewerkt!${newVariations.length > 0 ? `\n${newVariations.length} nieuwe variatie(s) toegevoegd` : ''}`);
+            showMessage(`Product "${productName}" succesvol bijgewerkt!${newVariations.length > 0 ? ` ${newVariations.length} nieuwe variatie(s) toegevoegd` : ''}`, 'success');
             onSuccess();
             handleClose();
         } catch (error) {
             console.error('Failed to update product:', error);
-            alert('Fout bij bijwerken product: ' + (error.response?.data?.error || error.message));
+            showMessage('Fout bij bijwerken product: ' + (error.response?.data?.error || error.message), 'error');
         } finally {
             setLoading(false);
         }
@@ -460,6 +479,45 @@ export default function EditProductModal({ open, onClose, onSuccess, productId }
                     {loading ? 'Bezig...' : 'Opslaan'}
                 </Button>
             </DialogActions>
+
+            {/* Confirmation Dialog */}
+            <Dialog
+                open={confirmDialog.open}
+                onClose={handleCancelDelete}
+                maxWidth="xs"
+                fullWidth
+            >
+                <DialogTitle>Variatie Verwijderen</DialogTitle>
+                <DialogContent>
+                    <Typography>
+                        Weet je zeker dat je deze variatie wilt verwijderen? Deze actie kan niet ongedaan worden gemaakt.
+                    </Typography>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={handleCancelDelete}>
+                        Annuleren
+                    </Button>
+                    <Button onClick={handleConfirmDelete} color="error" variant="contained">
+                        Verwijderen
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            <Snackbar
+                open={snackbar.open}
+                autoHideDuration={4000}
+                onClose={handleCloseSnackbar}
+                anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+            >
+                <Alert
+                    onClose={handleCloseSnackbar}
+                    severity={snackbar.severity}
+                    variant="filled"
+                    sx={{ width: '100%' }}
+                >
+                    {snackbar.message}
+                </Alert>
+            </Snackbar>
         </Dialog>
     );
 }

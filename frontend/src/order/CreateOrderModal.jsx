@@ -27,7 +27,9 @@ import {
     Divider,
     Select,
     MenuItem,
-    InputLabel
+    InputLabel,
+    Snackbar,
+    Alert
 } from '@mui/material';
 import {
     Add as AddIcon,
@@ -37,8 +39,11 @@ import {
     PersonAdd as PersonAddIcon, PostAdd
 } from '@mui/icons-material';
 import api from '../utils/api';
+import { useSnackbar } from '../utils/useSnackbar';
 
 export default function CreateOrderModal({ open, onClose, onSuccess }) {
+    const { snackbar, showSuccess, showError, showWarning, handleClose: handleCloseSnackbar } = useSnackbar();
+
     // Customer state
     const [selectedCustomer, setSelectedCustomer] = useState(null);
     const [customers, setCustomers] = useState([]);
@@ -152,7 +157,7 @@ export default function CreateOrderModal({ open, onClose, onSuccess }) {
 
     const createProduct = async () => {
         if (!newProductName || !newProductPrice) {
-            alert('Vul minimaal naam en prijs in');
+            showWarning('Vul minimaal naam en prijs in');
             return;
         }
 
@@ -188,10 +193,10 @@ export default function CreateOrderModal({ open, onClose, onSuccess }) {
             const skuMessage = newProductSku ?
                 `Product aangemaakt met SKU: ${createdProduct.sku}` :
                 `Product aangemaakt met automatische SKU: ${createdProduct.sku}`;
-            alert(`${skuMessage}\n\nProduct is toegevoegd aan de order!`);
+            showSuccess(`${skuMessage}. Product is toegevoegd aan de order!`);
         } catch (error) {
             console.error('Failed to create product:', error);
-            alert('Fout bij aanmaken product: ' + (error.response?.data?.error || error.message));
+            showError('Fout bij aanmaken product: ' + (error.response?.data?.error || error.message));
         }
     };
 
@@ -221,12 +226,12 @@ export default function CreateOrderModal({ open, onClose, onSuccess }) {
         // Validation
         if (useExistingCustomer) {
             if (!selectedCustomer || orderItems.length === 0) {
-                alert('Selecteer een klant en voeg minimaal 1 product toe');
+                showWarning('Selecteer een klant en voeg minimaal 1 product toe');
                 return;
             }
         } else {
             if (!customerEmail || !customerFirstName || orderItems.length === 0) {
-                alert('Vul alle verplichte velden in en voeg minimaal 1 product toe');
+                showWarning('Vul alle verplichte velden in en voeg minimaal 1 product toe');
                 return;
             }
         }
@@ -247,12 +252,12 @@ export default function CreateOrderModal({ open, onClose, onSuccess }) {
 
             const response = await api.post('/admin/sync/orders/create', requestData);
 
-            alert('Order succesvol aangemaakt!');
+            showSuccess('Order succesvol aangemaakt!');
             onSuccess();
             handleClose();
         } catch (error) {
             console.error('Failed to create order:', error);
-            alert('Fout bij aanmaken order: ' + (error.response?.data?.error || error.message));
+            showError('Fout bij aanmaken order: ' + (error.response?.data?.error || error.message));
         } finally {
             setLoading(false);
         }
@@ -628,6 +633,22 @@ export default function CreateOrderModal({ open, onClose, onSuccess }) {
                     {loading ? 'Bezig...' : 'Order Aanmaken'}
                 </Button>
             </DialogActions>
+
+            <Snackbar
+                open={snackbar.open}
+                autoHideDuration={4000}
+                onClose={handleCloseSnackbar}
+                anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+            >
+                <Alert
+                    onClose={handleCloseSnackbar}
+                    severity={snackbar.severity}
+                    variant="filled"
+                    sx={{ width: '100%' }}
+                >
+                    {snackbar.message}
+                </Alert>
+            </Snackbar>
         </Dialog>
     );
 }

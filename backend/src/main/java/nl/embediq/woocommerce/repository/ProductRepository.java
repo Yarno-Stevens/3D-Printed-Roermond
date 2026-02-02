@@ -26,6 +26,6 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
             "LOWER(p.description) LIKE LOWER(CONCAT('%', :search, '%'))")
     Page<Product> searchProducts(@Param("search") String search, Pageable pageable);
 
-    @Query("SELECT COUNT(p) FROM Product p WHERE p.lastSyncedAt > :since")
+    @Query("SELECT COUNT(p) FROM Product p WHERE p.createdAt >= :since")
     Long countSyncedSince(@Param("since") LocalDateTime since);
 }

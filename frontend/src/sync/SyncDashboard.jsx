@@ -1,6 +1,6 @@
 import React, {useEffect, useState} from 'react';
 import api from '../utils/api';
-import {Box, Card, CardContent, Grid, Typography, Button, Chip, LinearProgress, Alert, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, CircularProgress} from '@mui/material';
+import {Box, Card, CardContent, Grid, Typography, Button, Chip, LinearProgress, Alert, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, CircularProgress, Snackbar} from '@mui/material';
 import {Refresh, CheckCircle, Error, PlayArrow, Pause} from '@mui/icons-material';
 
 
@@ -11,6 +11,7 @@ export default function SyncDashboard () {
     const [loading, setLoading] = useState(true);
     const [syncing, setSyncing] = useState(false);
     const [error, setError] = useState(null);
+    const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
 
     useEffect(() => {
         fetchData();
@@ -19,6 +20,14 @@ export default function SyncDashboard () {
         const interval = setInterval(fetchData, 30000);
         return () => clearInterval(interval);
     }, []);
+
+    const showMessage = (message, severity = 'success') => {
+        setSnackbar({ open: true, message, severity });
+    };
+
+    const handleCloseSnackbar = () => {
+        setSnackbar({ ...snackbar, open: false });
+    };
 
     const fetchData = async () => {
         try {
@@ -43,12 +52,12 @@ export default function SyncDashboard () {
         setSyncing(true);
         try {
             await api.post('/admin/sync/trigger');
-            alert('Sync gestart! Data wordt op de achtergrond gesynchroniseerd.');
+            showMessage('Sync gestart! Data wordt op de achtergrond gesynchroniseerd.', 'success');
 
             // Refresh na 5 seconden
             setTimeout(fetchData, 5000);
         } catch (err) {
-            alert('Fout bij starten sync: ' + err.message);
+            showMessage('Fout bij starten sync: ' + err.message, 'error');
         } finally {
             setSyncing(false);
         }
@@ -387,6 +396,22 @@ export default function SyncDashboard () {
                     </Grid>
                 </Grid>
             )}
+
+            <Snackbar
+                open={snackbar.open}
+                autoHideDuration={4000}
+                onClose={handleCloseSnackbar}
+                anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+            >
+                <Alert
+                    onClose={handleCloseSnackbar}
+                    severity={snackbar.severity}
+                    variant="filled"
+                    sx={{ width: '100%' }}
+                >
+                    {snackbar.message}
+                </Alert>
+            </Snackbar>
         </Box>
     );
 }

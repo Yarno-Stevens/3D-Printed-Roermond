@@ -16,6 +16,6 @@ public interface CustomerRepository extends JpaRepository<Customer, Long> {
     
     Optional<Customer> findByEmail(String email);
 
-    @Query("SELECT COUNT(c) FROM Customer c WHERE c.lastSyncedAt > :since")
+    @Query("SELECT COUNT(c) FROM Customer c WHERE c.createdAt >= :since")
     Long countSyncedSince(@Param("since") LocalDateTime since);
 }
