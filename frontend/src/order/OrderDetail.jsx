@@ -30,7 +30,9 @@ import {
     LocalShipping,
     Receipt,
     AccessTime,
-    Sync
+    Sync,
+    PictureAsPdf,
+    Download
     } from '@mui/icons-material';
 
 
@@ -55,6 +57,28 @@ export default function OrderDetail() {
             setError('Fout bij ophalen van order details: ' + err.message);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleDownloadPdf = async () => {
+        try {
+            const response = await api.get(`/admin/sync/orders/${id}/pdf`, {
+                responseType: 'blob'
+            });
+
+            // Create a blob URL and trigger download
+            const blob = new Blob([response.data], { type: 'application/pdf' });
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', `order-${order.orderNumber}.pdf`);
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            window.URL.revokeObjectURL(url);
+        } catch (error) {
+            console.error('Failed to download PDF:', error);
+            alert('Fout bij downloaden PDF: ' + (error.response?.data?.error || error.message));
         }
     };
 
@@ -141,11 +165,20 @@ export default function OrderDetail() {
                         </Typography>
                     </Box>
                 </Box>
-                <Chip
-                    label={getStatusLabel(order.status)}
-                    color={getStatusColor(order.status)}
-                    size="large"
-                />
+                <Box display="flex" alignItems="center" gap={2}>
+                    <Button
+                        variant="contained"
+                        startIcon={<PictureAsPdf />}
+                        onClick={handleDownloadPdf}
+                    >
+                        Download PDF
+                    </Button>
+                    <Chip
+                        label={getStatusLabel(order.status)}
+                        color={getStatusColor(order.status)}
+                        size="large"
+                    />
+                </Box>
             </Box>
 
             <Grid container spacing={3}>

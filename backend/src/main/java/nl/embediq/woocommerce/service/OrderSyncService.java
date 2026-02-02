@@ -279,8 +279,48 @@ public class OrderSyncService {
         try {
             Optional<Customer> existing = customerRepository.findByEmail(billing.getEmail());
             if (existing.isPresent()) {
+                Customer customer = existing.get();
                 log.debug("Found existing customer with email: {}", billing.getEmail());
-                return existing.get();
+
+                // Update address if customer doesn't have one yet
+                boolean needsUpdate = false;
+                if (customer.getAddress() == null || customer.getAddress().isEmpty()) {
+                    customer.setCompanyName(billing.getCompany());
+                    customer.setPhone(billing.getPhone());
+                    customer.setAddress(billing.getAddress1());
+                    customer.setAddress2(billing.getAddress2());
+                    customer.setCity(billing.getCity());
+                    customer.setPostalCode(billing.getPostcode());
+                    customer.setState(billing.getState());
+                    customer.setCountry(billing.getCountry());
+                    needsUpdate = true;
+                }
+
+                // Update company name if empty
+                if (customer.getCompanyName() == null || customer.getCompanyName().isEmpty()) {
+                    if (billing.getCompany() != null && !billing.getCompany().isEmpty()) {
+                        customer.setCompanyName(billing.getCompany());
+                        needsUpdate = true;
+                    }
+                }
+
+                // Also update name if it was empty
+                if (customer.getFirstName() == null || customer.getFirstName().isEmpty()) {
+                    customer.setFirstName(billing.getFirstName());
+                    needsUpdate = true;
+                }
+                if (customer.getLastName() == null || customer.getLastName().isEmpty()) {
+                    customer.setLastName(billing.getLastName());
+                    needsUpdate = true;
+                }
+
+                if (needsUpdate) {
+                    customer.setLastSyncedAt(LocalDateTime.now());
+                    customer = customerRepository.save(customer);
+                    log.debug("Updated customer {} with address information", customer.getEmail());
+                }
+
+                return customer;
             }
         } catch (Exception e) {
             log.error("Error finding customer by email {}: {}", billing.getEmail(), e.getMessage());
@@ -294,11 +334,22 @@ public class OrderSyncService {
         customer.setEmail(billing.getEmail());
         customer.setFirstName(billing.getFirstName());
         customer.setLastName(billing.getLastName());
+        customer.setCompanyName(billing.getCompany());
+
+        // Add address information from billing
+        customer.setPhone(billing.getPhone());
+        customer.setAddress(billing.getAddress1());
+        customer.setAddress2(billing.getAddress2());
+        customer.setCity(billing.getCity());
+        customer.setPostalCode(billing.getPostcode());
+        customer.setState(billing.getState());
+        customer.setCountry(billing.getCountry());
+
         customer.setLastSyncedAt(LocalDateTime.now());
 
         try {
             customer = customerRepository.save(customer);
-            log.debug("Created new guest customer with email: {}", billing.getEmail());
+            log.debug("Created new guest customer with email and address: {}", billing.getEmail());
             return customer;
         } catch (Exception e) {
             log.error("Error saving guest customer with email {}: {}", billing.getEmail(), e.getMessage());

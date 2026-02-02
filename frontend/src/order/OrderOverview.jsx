@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../utils/api';
+import CreateOrderModal from './CreateOrderModal';
 import {
     Box,
     Card,
@@ -31,7 +32,8 @@ import {
     FilterList,
     Refresh,
     Visibility,
-    GetApp
+    GetApp,
+    Add as AddIcon
 } from '@mui/icons-material';
 import {useNavigate} from "react-router";
 
@@ -42,6 +44,7 @@ export default function OrdersOverview() {
     const [orders, setOrders] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [createModalOpen, setCreateModalOpen] = useState(false);
 
     // Pagination
     const [page, setPage] = useState(0);
@@ -105,6 +108,25 @@ export default function OrdersOverview() {
         setPage(0);
     };
 
+    const handleStatusChange = async (orderId, newStatus) => {
+        try {
+            await api.patch(`/admin/sync/orders/${orderId}/status`, {
+                status: newStatus
+            });
+
+            // Update local state
+            setOrders(orders.map(o =>
+                o.id === orderId ? { ...o, status: newStatus.toUpperCase() } : o
+            ));
+
+        } catch (error) {
+            console.error('Failed to update order status:', error);
+            alert('Fout bij wijzigen status: ' + (error.response?.data?.error || error.message));
+            // Refresh to show correct state
+            fetchOrders();
+        }
+    };
+
     const formatDate = (dateString) => {
         if (!dateString) return '-';
         return new Date(dateString).toLocaleString('nl-NL');
@@ -163,15 +185,28 @@ export default function OrdersOverview() {
                 <Typography variant="h4">Orders</Typography>
                 <Box>
                     <Button
+                        variant="contained"
+                        startIcon={<AddIcon />}
+                        onClick={() => setCreateModalOpen(true)}
+                        sx={{ mr: 1 }}
+                    >
+                        Nieuwe Order
+                    </Button>
+                    <Button
                         variant="outlined"
                         startIcon={<Refresh />}
                         onClick={fetchOrders}
-                        sx={{ mr: 1 }}
                     >
                         Ververs
                     </Button>
                 </Box>
             </Box>
+
+            <CreateOrderModal
+                open={createModalOpen}
+                onClose={() => setCreateModalOpen(false)}
+                onSuccess={fetchOrders}
+            />
 
             {error && (
                 <Alert severity="error" sx={{ mb: 3 }}>
@@ -318,11 +353,31 @@ export default function OrdersOverview() {
                                                         {order.customer?.email || '-'}
                                                     </TableCell>
                                                     <TableCell>
-                                                        <Chip
-                                                            label={getStatusLabel(order.status)}
-                                                            color={getStatusColor(order.status)}
-                                                            size="small"
-                                                        />
+                                                        {order.wooCommerceId ? (
+                                                            // WooCommerce order: show as chip (not editable)
+                                                            <Chip
+                                                                label={getStatusLabel(order.status)}
+                                                                color={getStatusColor(order.status)}
+                                                                size="small"
+                                                            />
+                                                        ) : (
+                                                            // Manual order: show as dropdown (editable)
+                                                            <Select
+                                                                value={order.status?.toLowerCase() || 'processing'}
+                                                                onChange={(e) => handleStatusChange(order.id, e.target.value)}
+                                                                size="small"
+                                                                variant="outlined"
+                                                                sx={{ minWidth: 140 }}
+                                                            >
+                                                                <MenuItem value="pending">In Afwachting</MenuItem>
+                                                                <MenuItem value="processing">In Behandeling</MenuItem>
+                                                                <MenuItem value="on-hold">In de Wacht</MenuItem>
+                                                                <MenuItem value="completed">Voltooid</MenuItem>
+                                                                <MenuItem value="cancelled">Geannuleerd</MenuItem>
+                                                                <MenuItem value="refunded">Terugbetaald</MenuItem>
+                                                                <MenuItem value="failed">Mislukt</MenuItem>
+                                                            </Select>
+                                                        )}
                                                     </TableCell>
                                                     <TableCell align="right">
                                                         <Typography variant="body2" fontWeight="bold">

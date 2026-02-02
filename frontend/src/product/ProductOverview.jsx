@@ -1,5 +1,7 @@
 import React, {useState, useEffect} from 'react';
 import api from '../utils/api';
+import CreateProductModal from './CreateProductModal';
+import EditProductModal from './EditProductModal';
 import {
     Box,
     Card,
@@ -29,7 +31,9 @@ import {
     Search,
     FilterList,
     Refresh,
-    Visibility
+    Visibility,
+    Add as AddIcon,
+    Edit as EditIcon
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router';
 
@@ -39,6 +43,9 @@ export default function ProductsOverview() {
     const [products, setProducts] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [createModalOpen, setCreateModalOpen] = useState(false);
+    const [editModalOpen, setEditModalOpen] = useState(false);
+    const [selectedProductId, setSelectedProductId] = useState(null);
 
     // Pagination
     const [page, setPage] = useState(0);
@@ -152,15 +159,38 @@ export default function ProductsOverview() {
                 <Typography variant="h4">Producten</Typography>
                 <Box>
                     <Button
+                        variant="contained"
+                        startIcon={<AddIcon />}
+                        onClick={() => setCreateModalOpen(true)}
+                        sx={{ mr: 1 }}
+                    >
+                        Nieuw Product
+                    </Button>
+                    <Button
                         variant="outlined"
                         startIcon={<Refresh />}
                         onClick={fetchProducts}
-                        sx={{ mr: 1 }}
                     >
                         Ververs
                     </Button>
                 </Box>
             </Box>
+
+            <CreateProductModal
+                open={createModalOpen}
+                onClose={() => setCreateModalOpen(false)}
+                onSuccess={fetchProducts}
+            />
+
+            <EditProductModal
+                open={editModalOpen}
+                onClose={() => {
+                    setEditModalOpen(false);
+                    setSelectedProductId(null);
+                }}
+                onSuccess={fetchProducts}
+                productId={selectedProductId}
+            />
 
             {error && (
                 <Alert severity="error" sx={{ mb: 3 }}>
@@ -279,7 +309,6 @@ export default function ProductsOverview() {
                                             <TableCell>Type</TableCell>
                                             <TableCell align="right">Prijs</TableCell>
                                             <TableCell>Status</TableCell>
-                                            <TableCell>Laatst gesynchroniseerd</TableCell>
                                             <TableCell align="center">Acties</TableCell>
                                         </TableRow>
                                     </TableHead>
@@ -354,21 +383,20 @@ export default function ProductsOverview() {
                                                             size="small"
                                                         />
                                                     </TableCell>
-                                                    <TableCell>
-                                                        <Typography variant="body2" color="textSecondary">
-                                                            {product.lastSyncedAt ?
-                                                                new Date(product.lastSyncedAt).toLocaleString('nl-NL', {
-                                                                    day: '2-digit',
-                                                                    month: '2-digit',
-                                                                    year: 'numeric',
-                                                                    hour: '2-digit',
-                                                                    minute: '2-digit'
-                                                                }) :
-                                                                'Nooit'
-                                                            }
-                                                        </Typography>
-                                                    </TableCell>
                                                     <TableCell align="center">
+                                                        {!product.wooCommerceId && (
+                                                        <Tooltip title="Bewerken">
+                                                            <IconButton
+                                                                size="small"
+                                                                onClick={() => {
+                                                                    setSelectedProductId(product.id);
+                                                                    setEditModalOpen(true);
+                                                                }}
+                                                            >
+                                                                <EditIcon fontSize="small" />
+                                                            </IconButton>
+                                                        </Tooltip>
+                                                            )}
                                                         <Tooltip title="Bekijk Details">
                                                             <IconButton
                                                                 size="small"

@@ -14,6 +14,8 @@ public class WooBilling {
     @JsonProperty("last_name")
     private String lastName;
     
+    private String company;
+
     private String email;
     
     private String phone;

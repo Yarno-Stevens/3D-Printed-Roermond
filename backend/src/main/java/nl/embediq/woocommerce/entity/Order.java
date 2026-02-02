@@ -19,7 +19,7 @@ public class Order {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
     
-    @Column(name = "woo_commerce_id", nullable = false, unique = true)
+    @Column(name = "woo_commerce_id", unique = true)
     private Long wooCommerceId;
     
     @Column(name = "order_number")

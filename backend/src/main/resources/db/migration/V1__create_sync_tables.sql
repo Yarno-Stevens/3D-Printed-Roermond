@@ -19,11 +19,11 @@ CREATE TABLE sync_status
 CREATE TABLE users
 (
     id         BIGINT AUTO_INCREMENT PRIMARY KEY,
-    username   VARCHAR(50) NOT NULL UNIQUE,
+    username   VARCHAR(50)  NOT NULL UNIQUE,
     password   VARCHAR(255) NOT NULL,
-    role       VARCHAR(20) NOT NULL DEFAULT 'ADMIN',
-    enabled    BOOLEAN NOT NULL DEFAULT TRUE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    role       VARCHAR(20)  NOT NULL DEFAULT 'ADMIN',
+    enabled    BOOLEAN      NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMP             DEFAULT CURRENT_TIMESTAMP,
     last_login TIMESTAMP NULL,
     INDEX      idx_username (username)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -36,19 +36,45 @@ CREATE TABLE customers
     email           VARCHAR(255) NOT NULL,
     first_name      VARCHAR(100),
     last_name       VARCHAR(100),
+    company_name    VARCHAR(255),
+    phone           VARCHAR(50),
+    address         VARCHAR(255),
+    address_2       VARCHAR(255),
+    city            VARCHAR(100),
+    postal_code     VARCHAR(20),
+    state           VARCHAR(100),
+    country         VARCHAR(100),
     last_synced_at  TIMESTAMP NULL,
     created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    updated_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON
+UPDATE CURRENT_TIMESTAMP,
     UNIQUE KEY uk_email (email),
     INDEX           idx_email (email),
     INDEX           idx_woo_commerce_id (woo_commerce_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE =utf8mb4_unicode_ci;
+
+-- Expenses
+CREATE TABLE expenses
+(
+    id           BIGINT AUTO_INCREMENT PRIMARY KEY,
+    description  VARCHAR(255)   NOT NULL,
+    amount       DECIMAL(10, 2) NOT NULL,
+    category     VARCHAR(100)   NOT NULL,
+    supplier     VARCHAR(255),
+    notes        TEXT,
+    expense_date DATETIME       NOT NULL,
+    created_at   DATETIME,
+    updated_at   DATETIME,
+    INDEX        idx_category (category),
+    INDEX        idx_expense_date (expense_date),
+    INDEX        idx_supplier (supplier)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Orders
 CREATE TABLE orders
 (
     id              BIGINT AUTO_INCREMENT PRIMARY KEY,
-    woo_commerce_id BIGINT      NOT NULL,
+    woo_commerce_id BIGINT NULL,
     order_number    VARCHAR(50),
     total           DECIMAL(10, 2),
     status          VARCHAR(50) NOT NULL,

@@ -120,6 +120,19 @@ public class CustomerSyncService {
         customer.setEmail(wooCustomer.getEmail());
         customer.setFirstName(wooCustomer.getFirstName());
         customer.setLastName(wooCustomer.getLastName());
+
+        // Add billing address info
+        if (wooCustomer.getBilling() != null) {
+            customer.setCompanyName(wooCustomer.getBilling().getCompany());
+            customer.setPhone(wooCustomer.getBilling().getPhone());
+            customer.setAddress(wooCustomer.getBilling().getAddress1());
+            customer.setAddress2(wooCustomer.getBilling().getAddress2());
+            customer.setCity(wooCustomer.getBilling().getCity());
+            customer.setPostalCode(wooCustomer.getBilling().getPostcode());
+            customer.setState(wooCustomer.getBilling().getState());
+            customer.setCountry(wooCustomer.getBilling().getCountry());
+        }
+
         customer.setLastSyncedAt(LocalDateTime.now());
 
         customerRepository.save(customer);

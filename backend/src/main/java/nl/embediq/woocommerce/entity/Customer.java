@@ -28,7 +28,31 @@ public class Customer {
     
     @Column(name = "last_name")
     private String lastName;
-    
+
+    @Column(name = "company_name")
+    private String companyName;
+
+    @Column(name = "phone")
+    private String phone;
+
+    @Column(name = "address")
+    private String address;
+
+    @Column(name = "address_2")
+    private String address2;
+
+    @Column(name = "city")
+    private String city;
+
+    @Column(name = "postal_code")
+    private String postalCode;
+
+    @Column(name = "state")
+    private String state;
+
+    @Column(name = "country")
+    private String country;
+
     @OneToMany(mappedBy = "customer", fetch = FetchType.LAZY)
     @JsonIgnore
     private List<Order> orders = new ArrayList<>();

@@ -56,6 +56,8 @@ export default function Header() {
                               className="text-text-Primary text-lg font-semibold hover:text-Secondary">Producten</Link>
                         <Link to="/customers"
                               className="text-text-Primary text-lg font-semibold hover:text-Secondary">Klanten</Link>
+                        <Link to="/expenses"
+                              className="text-text-Primary text-lg font-semibold hover:text-Secondary">Uitgaven</Link>
                     </div>
                     <div ref={dropdownRef} className="relative flex items-center justify-end gap-2 w-20 sm:w-60">
                         <p className="text-text-Primary text-right font-semibold hidden sm:block">{username}</p>

@@ -20,4 +20,8 @@ public class WooCustomer {
     
     @JsonProperty("date_modified")
     private String dateModified;
+
+    private WooBilling billing;
+
+    private WooBilling shipping;
 }

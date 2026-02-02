@@ -5,6 +5,7 @@ import Dashboard from "./Dashboard.jsx";
 import OrderOverview from "./order/OrderOverview.jsx";
 import ProductOverview from "./product/ProductOverview.jsx";
 import CustomerOverview from "./customer/CustomerOverview.jsx";
+import ExpenseOverview from "./expense/ExpenseOverview.jsx";
 import SyncDashboard from "./sync/SyncDashboard.jsx";
 import CustomerDetail from "./customer/CustomerDetail.jsx";
 import OrderDetail from "./order/OrderDetail.jsx";
@@ -29,6 +30,7 @@ function App() {
                                 <Route path="/orders" element={<OrderOverview/>}/>
                                 <Route path="/products" element={<ProductOverview/>}/>
                                 <Route path="/customers" element={<CustomerOverview/>}/>
+                                <Route path="/expenses" element={<ExpenseOverview/>}/>
                                 <Route path="/sync" element={<SyncDashboard/>}/>
                                 <Route path="/orders/:id" element={<OrderDetail />} />
                                 <Route path="/customers/:id" element={<CustomerDetail />} />

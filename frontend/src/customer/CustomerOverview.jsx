@@ -284,14 +284,6 @@ export default function CustomersOverview() {
                                                         </Typography>
                                                     </TableCell>
                                                     <TableCell align="center">
-                                                        <Tooltip title="Bekijk Orders">
-                                                            <IconButton
-                                                                size="small"
-                                                                onClick={() => navigate(`/customers/${customer.id}/orders`)}
-                                                            >
-                                                                <ShoppingCart fontSize="small"/>
-                                                            </IconButton>
-                                                        </Tooltip>
                                                         <Tooltip title="Bekijk Details">
                                                             <IconButton
                                                                 size="small"

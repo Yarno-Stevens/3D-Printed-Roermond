@@ -50,6 +50,9 @@ public class SyncMonitorController {
     private ProductRepository productRepository;
 
     @Autowired
+    private nl.embediq.woocommerce.repository.ExpenseRepository expenseRepository;
+
+    @Autowired
     private OrderSyncService orderSyncService;
 
     @Autowired
@@ -58,10 +61,20 @@ public class SyncMonitorController {
     @Autowired
     private ProductSyncService productSyncService;
 
+    @Autowired
+    private nl.embediq.woocommerce.service.SkuGeneratorService skuGeneratorService;
+
+    @Autowired
+    private nl.embediq.woocommerce.service.PdfGeneratorService pdfGeneratorService;
+
+    @Autowired
+    private nl.embediq.woocommerce.service.DashboardService dashboardService;
+
     // ==================== DASHBOARD ====================
 
     @GetMapping("/dashboard")
-    public ResponseEntity<SyncDashboard> getDashboard() {
+    public ResponseEntity<SyncDashboard> getDashboard(
+            @RequestParam(required = false) Integer year) {
         List<SyncStatus> statuses = syncStatusRepository.findAll();
 
         SyncStatus orderSync = statuses.stream()
@@ -106,6 +119,33 @@ public class SyncMonitorController {
         dashboard.setLastUpdate(LocalDateTime.now());
 
         return ResponseEntity.ok(dashboard);
+    }
+
+    @GetMapping("/revenue/stats")
+    public ResponseEntity<Map<String, Object>> getRevenueStats(
+            @RequestParam(required = false) Integer year,
+            @RequestParam(defaultValue = "month") String groupBy,
+            @RequestParam(required = false) Integer week) {
+
+        try {
+            Map<String, Object> stats = dashboardService.getRevenueStatistics(year, groupBy, week);
+            return ResponseEntity.ok(stats);
+        } catch (Exception e) {
+            log.error("Failed to get revenue stats", e);
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    @GetMapping("/customers/top")
+    public ResponseEntity<List<Map<String, Object>>> getTopCustomers(
+            @RequestParam(defaultValue = "5") int limit) {
+        try {
+            List<Map<String, Object>> topCustomers = dashboardService.getTopCustomers(limit);
+            return ResponseEntity.ok(topCustomers);
+        } catch (Exception e) {
+            log.error("Failed to get top customers", e);
+            return ResponseEntity.internalServerError().build();
+        }
     }
 
     // ==================== PRODUCTS ENDPOINTS ====================
@@ -327,6 +367,27 @@ public class SyncMonitorController {
                 .map(this::convertToOrderDTO)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
+    }
+
+    @GetMapping("/orders/{id}/pdf")
+    public ResponseEntity<byte[]> downloadOrderPdf(@PathVariable Long id) {
+        try {
+            Order order = orderRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Order not found"));
+
+            byte[] pdfBytes = pdfGeneratorService.generateOrderPdf(order);
+
+            org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
+            headers.setContentType(org.springframework.http.MediaType.APPLICATION_PDF);
+            headers.setContentDispositionFormData("attachment", "order-" + order.getOrderNumber() + ".pdf");
+            headers.setCacheControl("must-revalidate, post-check=0, pre-check=0");
+
+            return new ResponseEntity<>(pdfBytes, headers, org.springframework.http.HttpStatus.OK);
+
+        } catch (Exception e) {
+            log.error("Failed to generate PDF for order {}", id, e);
+            return ResponseEntity.internalServerError().build();
+        }
     }
 
     // ==================== CUSTOMERS ENDPOINTS ====================
@@ -565,8 +626,767 @@ public class SyncMonitorController {
         dto.setEmail(customer.getEmail());
         dto.setFirstName(customer.getFirstName());
         dto.setLastName(customer.getLastName());
+        dto.setCompanyName(customer.getCompanyName());
+        dto.setPhone(customer.getPhone());
+        dto.setAddress(customer.getAddress());
+        dto.setAddress2(customer.getAddress2());
+        dto.setCity(customer.getCity());
+        dto.setPostalCode(customer.getPostalCode());
+        dto.setState(customer.getState());
+        dto.setCountry(customer.getCountry());
         dto.setCreatedAt(customer.getCreatedAt());
         dto.setLastSyncedAt(customer.getLastSyncedAt());
+        return dto;
+    }
+
+    private ProductDTO convertToProductDTO(nl.embediq.woocommerce.entity.Product product) {
+        ProductDTO dto = new ProductDTO();
+        dto.setId(product.getId());
+        dto.setWooCommerceId(product.getWooCommerceId());
+        dto.setName(product.getName());
+        dto.setSku(product.getSku());
+        dto.setPrice(product.getPrice());
+        dto.setRegularPrice(product.getRegularPrice());
+        dto.setSalePrice(product.getSalePrice());
+        dto.setDescription(product.getDescription());
+        dto.setShortDescription(product.getShortDescription());
+        dto.setType(product.getType());
+        dto.setStatus(product.getStatus());
+        dto.setCreatedAt(product.getCreatedAt());
+        dto.setLastSyncedAt(product.getLastSyncedAt());
+
+        // Include variations
+        if (product.getVariations() != null && !product.getVariations().isEmpty()) {
+            List<ProductVariationDTO> variationDTOs = product.getVariations().stream()
+                .map(v -> {
+                    ProductVariationDTO varDTO = new ProductVariationDTO();
+                    varDTO.setId(v.getId());
+                    varDTO.setWooCommerceId(v.getWooCommerceId());
+                    varDTO.setSku(v.getSku());
+                    varDTO.setPrice(v.getPrice());
+                    varDTO.setRegularPrice(v.getRegularPrice());
+                    varDTO.setSalePrice(v.getSalePrice());
+                    varDTO.setDescription(v.getDescription());
+                    varDTO.setAttributes(v.getAttributes());
+                    varDTO.setWeight(v.getWeight());
+                    varDTO.setDimensions(v.getDimensions());
+                    varDTO.setStatus(v.getStatus());
+                    varDTO.setCreatedAt(v.getCreatedAt());
+                    varDTO.setLastSyncedAt(v.getLastSyncedAt());
+                    return varDTO;
+                })
+                .collect(Collectors.toList());
+            dto.setVariations(variationDTOs);
+        }
+
+        return dto;
+    }
+
+    @PostMapping("/orders/create")
+    public ResponseEntity<?> createOrder(@RequestBody OrderCreateRequest request) {
+        try {
+            log.info("Creating new order with {} items", request.getItems().size());
+
+            // Find or create customer
+            Customer customer;
+            if (request.getCustomerId() != null) {
+                customer = customerRepository.findById(request.getCustomerId())
+                        .orElseThrow(() -> new RuntimeException("Customer not found"));
+            } else {
+                // Create new customer
+                customer = new Customer();
+                customer.setEmail(request.getCustomerEmail());
+                customer.setFirstName(request.getCustomerFirstName());
+                customer.setLastName(request.getCustomerLastName());
+                customer.setCreatedAt(LocalDateTime.now());
+                customer = customerRepository.save(customer);
+            }
+
+            // Create order
+            Order order = new Order();
+            order.setCustomer(customer);
+            order.setOrderNumber("MANUAL-" + System.currentTimeMillis());
+            order.setStatus(nl.embediq.woocommerce.enums.OrderStatus.PROCESSING);
+            order.setCreatedAt(LocalDateTime.now());
+
+            // Calculate total
+            BigDecimal total = BigDecimal.ZERO;
+            for (OrderCreateRequest.OrderItemRequest itemReq : request.getItems()) {
+                BigDecimal itemTotal = itemReq.getPrice().multiply(new BigDecimal(itemReq.getQuantity()));
+                total = total.add(itemTotal);
+            }
+            order.setTotal(total);
+
+            order = orderRepository.save(order);
+
+            // Create order items
+            for (OrderCreateRequest.OrderItemRequest itemReq : request.getItems()) {
+                nl.embediq.woocommerce.entity.OrderItem orderItem = new nl.embediq.woocommerce.entity.OrderItem();
+                orderItem.setOrder(order);
+                orderItem.setProductId(itemReq.getProductId());
+                orderItem.setProductName(itemReq.getProductName());
+                orderItem.setQuantity(itemReq.getQuantity());
+                orderItem.setTotal(itemReq.getPrice().multiply(new BigDecimal(itemReq.getQuantity())));
+                order.getItems().add(orderItem);
+            }
+
+            order = orderRepository.save(order);
+
+            log.info("Order created successfully with ID: {}", order.getId());
+
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "orderId", order.getId(),
+                "orderNumber", order.getOrderNumber(),
+                "message", "Order created successfully"
+            ));
+
+        } catch (Exception e) {
+            log.error("Failed to create order", e);
+            return ResponseEntity.badRequest().body(Map.of(
+                "success", false,
+                "error", e.getMessage()
+            ));
+        }
+    }
+
+    @GetMapping("/products/search")
+    public ResponseEntity<List<ProductDTO>> searchProducts(@RequestParam(required = false) String query) {
+        try {
+            List<nl.embediq.woocommerce.entity.Product> products;
+
+            if (query != null && !query.isEmpty()) {
+                products = productRepository.findAll().stream()
+                    .filter(p -> p.getName().toLowerCase().contains(query.toLowerCase()) ||
+                                (p.getSku() != null && p.getSku().toLowerCase().contains(query.toLowerCase())))
+                    .limit(20)
+                    .collect(Collectors.toList());
+            } else {
+                products = productRepository.findAll().stream()
+                    .limit(20)
+                    .collect(Collectors.toList());
+            }
+
+            List<ProductDTO> dtos = products.stream()
+                .map(this::convertToProductDTO)
+                .collect(Collectors.toList());
+
+            return ResponseEntity.ok(dtos);
+        } catch (Exception e) {
+            log.error("Failed to search products", e);
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
+    @GetMapping("/customers/search")
+    public ResponseEntity<List<CustomerDTO>> searchCustomers(@RequestParam(required = false) String query) {
+        try {
+            List<Customer> customers;
+
+            if (query != null && !query.isEmpty()) {
+                String searchLower = query.toLowerCase();
+                customers = customerRepository.findAll().stream()
+                    .filter(c ->
+                        c.getEmail().toLowerCase().contains(searchLower) ||
+                        c.getFirstName().toLowerCase().contains(searchLower) ||
+                        c.getLastName().toLowerCase().contains(searchLower))
+                    .limit(20)
+                    .collect(Collectors.toList());
+            } else {
+                customers = customerRepository.findAll().stream()
+                    .limit(20)
+                    .collect(Collectors.toList());
+            }
+
+            List<CustomerDTO> dtos = customers.stream()
+                .map(this::convertToCustomerDTO)
+                .collect(Collectors.toList());
+
+            return ResponseEntity.ok(dtos);
+        } catch (Exception e) {
+            log.error("Failed to search customers", e);
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
+    @PostMapping("/products/create")
+    public ResponseEntity<?> createProduct(@RequestBody ProductCreateRequest request) {
+        try {
+            log.info("Creating new product: {}", request.getName());
+
+            nl.embediq.woocommerce.entity.Product product = new nl.embediq.woocommerce.entity.Product();
+            product.setName(request.getName());
+
+            // Generate SKU automatically if not provided
+            String generatedSku;
+            if (request.getSku() == null || request.getSku().trim().isEmpty()) {
+                generatedSku = skuGeneratorService.generateUniqueSku();
+                log.info("Generated SKU for product '{}': {}", request.getName(), generatedSku);
+            } else {
+                generatedSku = request.getSku();
+                // Validate provided SKU
+                final String skuToCheck = generatedSku;
+                if (productRepository.findAll().stream().anyMatch(p -> skuToCheck.equals(p.getSku()))) {
+                    return ResponseEntity.badRequest().body(Map.of(
+                        "success", false,
+                        "error", "SKU already exists: " + generatedSku
+                    ));
+                }
+            }
+            product.setSku(generatedSku);
+
+            product.setPrice(request.getPrice());
+            product.setRegularPrice(request.getPrice());
+            product.setDescription(request.getDescription());
+            product.setShortDescription(request.getShortDescription());
+
+            // Set type based on whether it has variations
+            if (request.getVariations() != null && !request.getVariations().isEmpty()) {
+                product.setType("variable");
+            } else {
+                product.setType("simple");
+            }
+
+            product.setStatus("publish");
+            product.setCreatedAt(LocalDateTime.now());
+
+            product = productRepository.save(product);
+
+            // Create variations if provided
+            if (request.getVariations() != null && !request.getVariations().isEmpty()) {
+                for (ProductVariationCreateRequest varReq : request.getVariations()) {
+                    nl.embediq.woocommerce.entity.ProductVariation variation =
+                        new nl.embediq.woocommerce.entity.ProductVariation();
+
+                    variation.setProduct(product);
+                    variation.setSku(skuGeneratorService.generateUniqueSku());
+                    variation.setPrice(varReq.getPrice());
+                    variation.setRegularPrice(varReq.getRegularPrice() != null ?
+                        varReq.getRegularPrice() : varReq.getPrice());
+                    variation.setSalePrice(varReq.getSalePrice());
+                    variation.setDescription(varReq.getDescription());
+                    variation.setAttributes(varReq.getAttributes());
+                    variation.setWeight(varReq.getWeight());
+                    variation.setDimensions(varReq.getDimensions());
+                    variation.setStatus("publish");
+                    variation.setCreatedAt(LocalDateTime.now());
+
+                    product.getVariations().add(variation);
+                }
+
+                product = productRepository.save(product);
+                log.info("Created {} variations for product ID: {}",
+                    request.getVariations().size(), product.getId());
+            }
+
+            log.info("Product created successfully with ID: {} and SKU: {}",
+                product.getId(), product.getSku());
+
+            ProductDTO dto = convertToProductDTO(product);
+
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "product", dto,
+                "message", "Product created successfully"
+            ));
+
+        } catch (Exception e) {
+            log.error("Failed to create product", e);
+            return ResponseEntity.badRequest().body(Map.of(
+                "success", false,
+                "error", e.getMessage()
+            ));
+        }
+    }
+
+    @PostMapping("/products/{productId}/variations")
+    public ResponseEntity<?> addProductVariation(
+            @PathVariable Long productId,
+            @RequestBody ProductVariationCreateRequest request) {
+        try {
+            nl.embediq.woocommerce.entity.Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new RuntimeException("Product not found"));
+
+            nl.embediq.woocommerce.entity.ProductVariation variation =
+                new nl.embediq.woocommerce.entity.ProductVariation();
+
+            variation.setProduct(product);
+            variation.setSku(skuGeneratorService.generateUniqueSku());
+            variation.setPrice(request.getPrice());
+            variation.setRegularPrice(request.getRegularPrice() != null ?
+                request.getRegularPrice() : request.getPrice());
+            variation.setSalePrice(request.getSalePrice());
+            variation.setDescription(request.getDescription());
+            variation.setAttributes(request.getAttributes());
+            variation.setWeight(request.getWeight());
+            variation.setDimensions(request.getDimensions());
+            variation.setStatus("publish");
+            variation.setCreatedAt(LocalDateTime.now());
+
+            product.getVariations().add(variation);
+
+            // Update product type to variable if it was simple
+            if ("simple".equals(product.getType())) {
+                product.setType("variable");
+            }
+
+            productRepository.save(product);
+
+            log.info("Added variation to product ID: {}", productId);
+
+            ProductVariationDTO dto = new ProductVariationDTO();
+            dto.setId(variation.getId());
+            dto.setSku(variation.getSku());
+            dto.setPrice(variation.getPrice());
+            dto.setRegularPrice(variation.getRegularPrice());
+            dto.setSalePrice(variation.getSalePrice());
+            dto.setDescription(variation.getDescription());
+            dto.setAttributes(variation.getAttributes());
+            dto.setWeight(variation.getWeight());
+            dto.setDimensions(variation.getDimensions());
+            dto.setStatus(variation.getStatus());
+
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "variation", dto,
+                "message", "Variation added successfully"
+            ));
+
+        } catch (Exception e) {
+            log.error("Failed to add variation", e);
+            return ResponseEntity.badRequest().body(Map.of(
+                "success", false,
+                "error", e.getMessage()
+            ));
+        }
+    }
+
+    @PutMapping("/products/{productId}")
+    public ResponseEntity<?> updateProduct(
+            @PathVariable Long productId,
+            @RequestBody ProductCreateRequest request) {
+        try {
+            nl.embediq.woocommerce.entity.Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new RuntimeException("Product not found"));
+
+            log.info("Updating product ID: {}", productId);
+
+            // Update basic fields
+            product.setName(request.getName());
+            product.setPrice(request.getPrice());
+            product.setRegularPrice(request.getPrice());
+            product.setDescription(request.getDescription());
+            product.setShortDescription(request.getShortDescription());
+
+            // Only update SKU if provided and different
+            if (request.getSku() != null && !request.getSku().trim().isEmpty()) {
+                final String newSku = request.getSku();
+                // Check if SKU is taken by another product
+                boolean skuTaken = productRepository.findAll().stream()
+                    .anyMatch(p -> !p.getId().equals(productId) && newSku.equals(p.getSku()));
+
+                if (skuTaken) {
+                    return ResponseEntity.badRequest().body(Map.of(
+                        "success", false,
+                        "error", "SKU already exists: " + newSku
+                    ));
+                }
+                product.setSku(newSku);
+            }
+
+            product = productRepository.save(product);
+
+            log.info("Product updated successfully: {}", productId);
+
+            ProductDTO dto = convertToProductDTO(product);
+
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "product", dto,
+                "message", "Product updated successfully"
+            ));
+
+        } catch (Exception e) {
+            log.error("Failed to update product", e);
+            return ResponseEntity.badRequest().body(Map.of(
+                "success", false,
+                "error", e.getMessage()
+            ));
+        }
+    }
+
+    @DeleteMapping("/products/{productId}/variations/{variationId}")
+    public ResponseEntity<?> deleteProductVariation(
+            @PathVariable Long productId,
+            @PathVariable Long variationId) {
+        try {
+            nl.embediq.woocommerce.entity.Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new RuntimeException("Product not found"));
+
+            // Remove variation from product
+            product.getVariations().removeIf(v -> v.getId().equals(variationId));
+
+            // Update product type if no variations left
+            if (product.getVariations().isEmpty() && "variable".equals(product.getType())) {
+                product.setType("simple");
+            }
+
+            productRepository.save(product);
+
+            log.info("Variation {} removed from product {}", variationId, productId);
+
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "message", "Variation deleted successfully"
+            ));
+
+        } catch (Exception e) {
+            log.error("Failed to delete variation", e);
+            return ResponseEntity.badRequest().body(Map.of(
+                "success", false,
+                "error", e.getMessage()
+            ));
+        }
+    }
+
+    @PatchMapping("/products/{productId}/status")
+    public ResponseEntity<?> updateProductStatus(
+            @PathVariable Long productId,
+            @RequestBody Map<String, String> request) {
+        try {
+            nl.embediq.woocommerce.entity.Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new RuntimeException("Product not found"));
+
+            String newStatus = request.get("status");
+            if (newStatus == null || newStatus.trim().isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "error", "Status is required"
+                ));
+            }
+
+            // Update status
+            product.setStatus(newStatus);
+            productRepository.save(product);
+
+            log.info("Product {} status updated to: {}", productId, newStatus);
+
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "message", "Product status updated successfully",
+                "status", newStatus
+            ));
+
+        } catch (Exception e) {
+            log.error("Failed to update product status", e);
+            return ResponseEntity.badRequest().body(Map.of(
+                "success", false,
+                "error", e.getMessage()
+            ));
+        }
+    }
+
+    @PatchMapping("/orders/{orderId}/status")
+    public ResponseEntity<?> updateOrderStatus(
+            @PathVariable Long orderId,
+            @RequestBody Map<String, String> request) {
+        try {
+            Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new RuntimeException("Order not found"));
+
+            // Only allow status change for manually created orders (no WooCommerce ID)
+            if (order.getWooCommerceId() != null) {
+                return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "error", "Cannot change status of WooCommerce synced orders"
+                ));
+            }
+
+            String newStatus = request.get("status");
+            if (newStatus == null || newStatus.trim().isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "error", "Status is required"
+                ));
+            }
+
+            // Parse and validate status
+            try {
+                nl.embediq.woocommerce.enums.OrderStatus orderStatus =
+                    nl.embediq.woocommerce.enums.OrderStatus.valueOf(newStatus.toUpperCase());
+
+                order.setStatus(orderStatus);
+                orderRepository.save(order);
+
+                log.info("Order {} status updated to: {}", orderId, newStatus);
+
+                return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "message", "Order status updated successfully",
+                    "status", orderStatus.toString()
+                ));
+
+            } catch (IllegalArgumentException e) {
+                return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "error", "Invalid status. Must be one of: PENDING, PROCESSING, ON_HOLD, COMPLETED, CANCELLED, REFUNDED, FAILED"
+                ));
+            }
+
+        } catch (Exception e) {
+            log.error("Failed to update order status", e);
+            return ResponseEntity.badRequest().body(Map.of(
+                "success", false,
+                "error", e.getMessage()
+            ));
+        }
+    }
+
+    // ==================== EXPENSES ENDPOINTS ====================
+
+    @GetMapping("/expenses")
+    public ResponseEntity<Page<ExpenseDTO>> getExpenses(
+            @RequestParam(required = false) String category,
+            @RequestParam(required = false) String supplier,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime dateFrom,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime dateTo,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "25") int size
+    ) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by("expenseDate").descending());
+
+        List<nl.embediq.woocommerce.entity.Expense> allExpenses = expenseRepository.findAll();
+
+        // Apply filters
+        if (category != null && !category.isEmpty()) {
+            allExpenses = allExpenses.stream()
+                .filter(e -> e.getCategory().equalsIgnoreCase(category))
+                .collect(Collectors.toList());
+        }
+
+        if (supplier != null && !supplier.isEmpty()) {
+            allExpenses = allExpenses.stream()
+                .filter(e -> e.getSupplier() != null &&
+                           e.getSupplier().toLowerCase().contains(supplier.toLowerCase()))
+                .collect(Collectors.toList());
+        }
+
+        if (dateFrom != null) {
+            allExpenses = allExpenses.stream()
+                .filter(e -> e.getExpenseDate().isAfter(dateFrom))
+                .collect(Collectors.toList());
+        }
+
+        if (dateTo != null) {
+            allExpenses = allExpenses.stream()
+                .filter(e -> e.getExpenseDate().isBefore(dateTo))
+                .collect(Collectors.toList());
+        }
+
+        // Convert to DTOs with pagination
+        List<ExpenseDTO> expenseDTOs = allExpenses.stream()
+            .sorted((e1, e2) -> e2.getExpenseDate().compareTo(e1.getExpenseDate()))
+            .skip((long) page * size)
+            .limit(size)
+            .map(this::convertToExpenseDTO)
+            .collect(Collectors.toList());
+
+        long total = allExpenses.size();
+        Page<ExpenseDTO> expensePage = new PageImpl<>(expenseDTOs, pageable, total);
+
+        return ResponseEntity.ok(expensePage);
+    }
+
+    @GetMapping("/expenses/{id}")
+    public ResponseEntity<ExpenseDTO> getExpenseById(@PathVariable Long id) {
+        return expenseRepository.findById(id)
+            .map(this::convertToExpenseDTO)
+            .map(ResponseEntity::ok)
+            .orElse(ResponseEntity.notFound().build());
+    }
+
+    @PostMapping("/expenses")
+    public ResponseEntity<?> createExpense(@RequestBody ExpenseCreateRequest request) {
+        try {
+            log.info("Creating new expense: {}", request.getDescription());
+
+            nl.embediq.woocommerce.entity.Expense expense = new nl.embediq.woocommerce.entity.Expense();
+            expense.setDescription(request.getDescription());
+            expense.setAmount(request.getAmount());
+            expense.setCategory(request.getCategory());
+            expense.setSupplier(request.getSupplier());
+            expense.setNotes(request.getNotes());
+            expense.setExpenseDate(request.getExpenseDate() != null ?
+                request.getExpenseDate() : LocalDateTime.now());
+
+            expense = expenseRepository.save(expense);
+
+            log.info("Expense created successfully with ID: {}", expense.getId());
+
+            ExpenseDTO dto = convertToExpenseDTO(expense);
+
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "expense", dto,
+                "message", "Expense created successfully"
+            ));
+
+        } catch (Exception e) {
+            log.error("Failed to create expense", e);
+            return ResponseEntity.badRequest().body(Map.of(
+                "success", false,
+                "error", e.getMessage()
+            ));
+        }
+    }
+
+    @PutMapping("/expenses/{id}")
+    public ResponseEntity<?> updateExpense(
+            @PathVariable Long id,
+            @RequestBody ExpenseCreateRequest request) {
+        try {
+            nl.embediq.woocommerce.entity.Expense expense = expenseRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Expense not found"));
+
+            log.info("Updating expense ID: {}", id);
+
+            expense.setDescription(request.getDescription());
+            expense.setAmount(request.getAmount());
+            expense.setCategory(request.getCategory());
+            expense.setSupplier(request.getSupplier());
+            expense.setNotes(request.getNotes());
+            if (request.getExpenseDate() != null) {
+                expense.setExpenseDate(request.getExpenseDate());
+            }
+
+            expense = expenseRepository.save(expense);
+
+            log.info("Expense updated successfully: {}", id);
+
+            ExpenseDTO dto = convertToExpenseDTO(expense);
+
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "expense", dto,
+                "message", "Expense updated successfully"
+            ));
+
+        } catch (Exception e) {
+            log.error("Failed to update expense", e);
+            return ResponseEntity.badRequest().body(Map.of(
+                "success", false,
+                "error", e.getMessage()
+            ));
+        }
+    }
+
+    @DeleteMapping("/expenses/{id}")
+    public ResponseEntity<?> deleteExpense(@PathVariable Long id) {
+        try {
+            if (!expenseRepository.existsById(id)) {
+                return ResponseEntity.notFound().build();
+            }
+
+            expenseRepository.deleteById(id);
+
+            log.info("Expense deleted: {}", id);
+
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "message", "Expense deleted successfully"
+            ));
+
+        } catch (Exception e) {
+            log.error("Failed to delete expense", e);
+            return ResponseEntity.badRequest().body(Map.of(
+                "success", false,
+                "error", e.getMessage()
+            ));
+        }
+    }
+
+    @GetMapping("/expenses/categories")
+    public ResponseEntity<List<String>> getExpenseCategories() {
+        List<String> categories = expenseRepository.findDistinctCategories();
+        return ResponseEntity.ok(categories);
+    }
+
+    @GetMapping("/expenses/suppliers")
+    public ResponseEntity<List<String>> getExpenseSuppliers() {
+        List<String> suppliers = expenseRepository.findDistinctSuppliers();
+        return ResponseEntity.ok(suppliers);
+    }
+
+    @GetMapping("/expenses/stats")
+    public ResponseEntity<Map<String, Object>> getExpenseStats(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime dateFrom,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime dateTo
+    ) {
+        List<nl.embediq.woocommerce.entity.Expense> expenses = expenseRepository.findAll();
+
+        // Apply date filter
+        if (dateFrom != null) {
+            expenses = expenses.stream()
+                .filter(e -> e.getExpenseDate().isAfter(dateFrom))
+                .collect(Collectors.toList());
+        }
+
+        if (dateTo != null) {
+            expenses = expenses.stream()
+                .filter(e -> e.getExpenseDate().isBefore(dateTo))
+                .collect(Collectors.toList());
+        }
+
+        // Calculate total
+        BigDecimal totalExpenses = expenses.stream()
+            .map(nl.embediq.woocommerce.entity.Expense::getAmount)
+            .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        // Group by category
+        Map<String, BigDecimal> byCategory = expenses.stream()
+            .collect(Collectors.groupingBy(
+                nl.embediq.woocommerce.entity.Expense::getCategory,
+                Collectors.reducing(BigDecimal.ZERO,
+                    nl.embediq.woocommerce.entity.Expense::getAmount,
+                    BigDecimal::add)
+            ));
+
+        // Monthly expenses (last 6 months)
+        Map<String, BigDecimal> monthlyExpenses = new LinkedHashMap<>();
+        for (int i = 5; i >= 0; i--) {
+            LocalDate month = LocalDate.now().minusMonths(i);
+            LocalDateTime startOfMonth = month.withDayOfMonth(1).atStartOfDay();
+            LocalDateTime endOfMonth = month.withDayOfMonth(month.lengthOfMonth()).atTime(23, 59, 59);
+
+            BigDecimal monthTotal = expenses.stream()
+                .filter(e -> e.getExpenseDate().isAfter(startOfMonth) &&
+                           e.getExpenseDate().isBefore(endOfMonth))
+                .map(nl.embediq.woocommerce.entity.Expense::getAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+            monthlyExpenses.put(month.toString().substring(0, 7), monthTotal);
+        }
+
+        Map<String, Object> stats = new HashMap<>();
+        stats.put("totalExpenses", totalExpenses);
+        stats.put("expenseCount", expenses.size());
+        stats.put("byCategory", byCategory);
+        stats.put("monthlyExpenses", monthlyExpenses);
+
+        return ResponseEntity.ok(stats);
+    }
+
+    private ExpenseDTO convertToExpenseDTO(nl.embediq.woocommerce.entity.Expense expense) {
+        ExpenseDTO dto = new ExpenseDTO();
+        dto.setId(expense.getId());
+        dto.setDescription(expense.getDescription());
+        dto.setAmount(expense.getAmount());
+        dto.setCategory(expense.getCategory());
+        dto.setSupplier(expense.getSupplier());
+        dto.setNotes(expense.getNotes());
+        dto.setExpenseDate(expense.getExpenseDate());
+        dto.setCreatedAt(expense.getCreatedAt());
+        dto.setUpdatedAt(expense.getUpdatedAt());
         return dto;
     }
 }
