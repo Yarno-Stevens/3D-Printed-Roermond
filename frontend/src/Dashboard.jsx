@@ -35,8 +35,8 @@ import {
     Assessment
 } from '@mui/icons-material';
 import {
-    LineChart,
-    Line,
+    BarChart,
+    Bar,
     XAxis,
     YAxis,
     CartesianGrid,
@@ -364,7 +364,7 @@ export default function Dashboard() {
 
                                 {/* Revenue, Expenses & Profit Chart */}
                                 <ResponsiveContainer width="100%" height={500}>
-                                    <LineChart
+                                    <BarChart
                                         data={Object.keys(revenueStats.revenueByPeriod || {}).map(period => ({
                                             period,
                                             revenue: parseFloat(revenueStats.revenueByPeriod[period] || 0),
@@ -388,34 +388,25 @@ export default function Dashboard() {
                                             labelStyle={{ color: '#000' }}
                                         />
                                         <Legend />
-                                        <Line
-                                            type="monotone"
+                                        <Bar
                                             dataKey="revenue"
-                                            stroke="#82ca9d"
-                                            strokeWidth={2}
+                                            fill="#82ca9d"
                                             name="Omzet (€)"
-                                            dot={{ r: 4 }}
-                                            activeDot={{ r: 6 }}
+                                            barSize={40}
                                         />
-                                        <Line
-                                            type="monotone"
+                                        <Bar
                                             dataKey="expenses"
-                                            stroke="#ff6b6b"
-                                            strokeWidth={2}
+                                            fill="#ff6b6b"
                                             name="Uitgaven (€)"
-                                            dot={{ r: 4 }}
-                                            activeDot={{ r: 6 }}
+                                            barSize={40}
                                         />
-                                        <Line
-                                            type="monotone"
+                                        <Bar
                                             dataKey="profit"
-                                            stroke="#4dabf7"
-                                            strokeWidth={2}
+                                            fill="#4dabf7"
                                             name="Winst (€)"
-                                            dot={{ r: 4 }}
-                                            activeDot={{ r: 6 }}
+                                            barSize={40}
                                         />
-                                    </LineChart>
+                                    </BarChart>
                                 </ResponsiveContainer>
                             </CardContent>
                         </Card>
