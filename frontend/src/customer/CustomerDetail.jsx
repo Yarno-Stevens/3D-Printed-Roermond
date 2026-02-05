@@ -288,14 +288,57 @@ export default function CustomerDetail() {
                                         {customer.email}
                                     </Typography>
                                 </Box>
-                                <Box mb={2}>
-                                    <Typography variant="body2" color="textSecondary" gutterBottom>
-                                        WooCommerce ID
-                                    </Typography>
-                                    <Typography variant="body1">
-                                        {customer.wooCommerceId || 'Gast'}
-                                    </Typography>
-                                </Box>
+                                {/* Extra klantvelden: bedrijf, telefoon en adres */}
+                                {customer.companyName && (
+                                    <Box mb={2}>
+                                        <Typography variant="body2" color="textSecondary" gutterBottom>
+                                            Bedrijf
+                                        </Typography>
+                                        <Typography variant="body1">
+                                            {customer.companyName}
+                                        </Typography>
+                                    </Box>
+                                )}
+                                {customer.phone && (
+                                    <Box mb={2}>
+                                        <Typography variant="body2" color="textSecondary" gutterBottom>
+                                            Telefoon
+                                        </Typography>
+                                        <Typography variant="body1">
+                                            {customer.phone}
+                                        </Typography>
+                                    </Box>
+                                )}
+                                {(customer.address || customer.address2) && (
+                                    <Box mb={2}>
+                                        <Typography variant="body2" color="textSecondary" gutterBottom>
+                                            Adres
+                                        </Typography>
+                                        <Typography variant="body1">
+                                            {customer.address}{customer.address2 ? `, ${customer.address2}` : ''}
+                                        </Typography>
+                                    </Box>
+                                )}
+                                {(customer.city || customer.postalCode) && (
+                                    <Box mb={2}>
+                                        <Typography variant="body2" color="textSecondary" gutterBottom>
+                                            Plaats / Postcode
+                                        </Typography>
+                                        <Typography variant="body1">
+                                            {customer.city}{customer.postalCode ? `, ${customer.postalCode}` : ''}
+                                        </Typography>
+                                    </Box>
+                                )}
+                                {(customer.state || customer.country) && (
+                                    <Box mb={2}>
+                                        <Typography variant="body2" color="textSecondary" gutterBottom>
+                                            Provincie / Land
+                                        </Typography>
+                                        <Typography variant="body1">
+                                            {customer.state}{customer.country ? `, ${customer.country}` : ''}
+                                        </Typography>
+                                    </Box>
+                                )}
                             </Grid>
 
                             <Grid item xs={12} md={6}>

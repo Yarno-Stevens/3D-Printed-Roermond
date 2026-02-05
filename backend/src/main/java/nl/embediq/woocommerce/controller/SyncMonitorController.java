@@ -697,6 +697,14 @@ public class SyncMonitorController {
                 customer.setEmail(request.getCustomerEmail());
                 customer.setFirstName(request.getCustomerFirstName());
                 customer.setLastName(request.getCustomerLastName());
+                customer.setCompanyName(request.getCustomerCompanyName());
+                customer.setPhone(request.getCustomerPhone());
+                customer.setAddress(request.getCustomerAddress());
+                customer.setAddress2(request.getCustomerAddress2());
+                customer.setCity(request.getCustomerCity());
+                customer.setPostalCode(request.getCustomerPostalCode());
+                customer.setState(request.getCustomerState());
+                customer.setCountry(request.getCustomerCountry());
                 customer.setCreatedAt(LocalDateTime.now());
                 customer = customerRepository.save(customer);
             }
@@ -704,8 +712,8 @@ public class SyncMonitorController {
             // Create order
             Order order = new Order();
             order.setCustomer(customer);
-            order.setOrderNumber("MANUAL-" + System.currentTimeMillis());
-            order.setStatus(nl.embediq.woocommerce.enums.OrderStatus.PROCESSING);
+            order.setOrderNumber(LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMddHHmmss")));
+            order.setStatus(nl.embediq.woocommerce.enums.OrderStatus.PENDING);
             order.setCreatedAt(LocalDateTime.now());
 
             // Calculate total

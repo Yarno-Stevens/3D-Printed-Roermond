@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, {useState, useEffect} from 'react';
 import {
     Dialog,
     DialogTitle,
@@ -18,13 +18,10 @@ import {
     TableRow,
     Paper,
     InputAdornment,
-    Chip,
     Radio,
     RadioGroup,
     FormControlLabel,
     FormControl,
-    FormLabel,
-    Divider,
     Select,
     MenuItem,
     InputLabel,
@@ -36,13 +33,13 @@ import {
     Delete as DeleteIcon,
     Close as CloseIcon,
     ShoppingCart,
-    PersonAdd as PersonAddIcon, PostAdd
+    PostAdd
 } from '@mui/icons-material';
 import api from '../utils/api';
-import { useSnackbar } from '../utils/useSnackbar';
+import {useSnackbar} from '../utils/useSnackbar';
 
-export default function CreateOrderModal({ open, onClose, onSuccess }) {
-    const { snackbar, showSuccess, showError, showWarning, handleClose: handleCloseSnackbar } = useSnackbar();
+export default function CreateOrderModal({open, onClose, onSuccess}) {
+    const {snackbar, showSuccess, showError, showWarning, handleClose: handleCloseSnackbar} = useSnackbar();
 
     // Customer state
     const [selectedCustomer, setSelectedCustomer] = useState(null);
@@ -52,6 +49,15 @@ export default function CreateOrderModal({ open, onClose, onSuccess }) {
     const [customerEmail, setCustomerEmail] = useState('');
     const [customerFirstName, setCustomerFirstName] = useState('');
     const [customerLastName, setCustomerLastName] = useState('');
+    // New customer extra fields
+    const [customerCompanyName, setCustomerCompanyName] = useState('');
+    const [customerPhone, setCustomerPhone] = useState('');
+    const [customerAddress, setCustomerAddress] = useState('');
+    const [customerAddress2, setCustomerAddress2] = useState('');
+    const [customerCity, setCustomerCity] = useState('');
+    const [customerPostalCode, setCustomerPostalCode] = useState('');
+    const [customerState, setCustomerState] = useState('');
+    const [customerCountry, setCustomerCountry] = useState('');
 
     // Product state
     const [orderItems, setOrderItems] = useState([]);
@@ -80,7 +86,7 @@ export default function CreateOrderModal({ open, onClose, onSuccess }) {
     const fetchProducts = async () => {
         try {
             const response = await api.get('/admin/sync/products/search', {
-                params: { query: searchQuery }
+                params: {query: searchQuery}
             });
             setProducts(response.data);
         } catch (error) {
@@ -91,7 +97,7 @@ export default function CreateOrderModal({ open, onClose, onSuccess }) {
     const fetchCustomers = async () => {
         try {
             const response = await api.get('/admin/sync/customers/search', {
-                params: { query: customerSearchQuery }
+                params: {query: customerSearchQuery}
             });
             setCustomers(response.data);
         } catch (error) {
@@ -124,7 +130,7 @@ export default function CreateOrderModal({ open, onClose, onSuccess }) {
             // Update quantity if product+variation already in order
             setOrderItems(orderItems.map(item =>
                 item.productId === productId && item.variationId === variationId
-                    ? { ...item, quantity: item.quantity + quantity }
+                    ? {...item, quantity: item.quantity + quantity}
                     : item
             ));
         } else {
@@ -213,7 +219,7 @@ export default function CreateOrderModal({ open, onClose, onSuccess }) {
         }
         setOrderItems(orderItems.map(item =>
             item.productId === productId && item.variationId === variationId
-                ? { ...item, quantity: newQuantity }
+                ? {...item, quantity: newQuantity}
                 : item
         ));
     };
@@ -248,9 +254,17 @@ export default function CreateOrderModal({ open, onClose, onSuccess }) {
                 requestData.customerEmail = customerEmail;
                 requestData.customerFirstName = customerFirstName;
                 requestData.customerLastName = customerLastName;
+                requestData.customerCompanyName = customerCompanyName;
+                requestData.customerPhone = customerPhone;
+                requestData.customerAddress = customerAddress;
+                requestData.customerAddress2 = customerAddress2;
+                requestData.customerCity = customerCity;
+                requestData.customerPostalCode = customerPostalCode;
+                requestData.customerState = customerState;
+                requestData.customerCountry = customerCountry;
             }
 
-            const response = await api.post('/admin/sync/orders/create', requestData);
+            await api.post('/admin/sync/orders/create', requestData);
 
             showSuccess('Order succesvol aangemaakt!');
             onSuccess();
@@ -271,6 +285,14 @@ export default function CreateOrderModal({ open, onClose, onSuccess }) {
         setCustomerEmail('');
         setCustomerFirstName('');
         setCustomerLastName('');
+        setCustomerCompanyName('');
+        setCustomerPhone('');
+        setCustomerAddress('');
+        setCustomerAddress2('');
+        setCustomerCity('');
+        setCustomerPostalCode('');
+        setCustomerState('');
+        setCustomerCountry('');
         setOrderItems([]);
         setSelectedProduct(null);
         setSelectedVariation(null);
@@ -289,11 +311,11 @@ export default function CreateOrderModal({ open, onClose, onSuccess }) {
             <DialogTitle>
                 <Box display="flex" alignItems="center" justifyContent="space-between">
                     <Box display="flex" alignItems="center" gap={1}>
-                        <ShoppingCart />
+                        <ShoppingCart/>
                         <span>Nieuwe Order Aanmaken</span>
                     </Box>
                     <IconButton onClick={handleClose}>
-                        <CloseIcon />
+                        <CloseIcon/>
                     </IconButton>
                 </Box>
             </DialogTitle>
@@ -304,14 +326,14 @@ export default function CreateOrderModal({ open, onClose, onSuccess }) {
                     <Typography variant="h6" gutterBottom>
                         Klantgegevens
                     </Typography>
-                    <FormControl component="fieldset" sx={{ mb: 2 }}>
+                    <FormControl component="fieldset" sx={{mb: 2}}>
                         <RadioGroup
                             row
                             value={useExistingCustomer.toString()}
                             onChange={(e) => setUseExistingCustomer(e.target.value === 'true')}
                         >
-                            <FormControlLabel value="true" control={<Radio />} label="Bestaande klant" />
-                            <FormControlLabel value="false" control={<Radio />} label="Nieuwe klant" />
+                            <FormControlLabel value="true" control={<Radio/>} label="Bestaande klant"/>
+                            <FormControlLabel value="false" control={<Radio/>} label="Nieuwe klant"/>
                         </RadioGroup>
                     </FormControl>
 
@@ -347,7 +369,7 @@ export default function CreateOrderModal({ open, onClose, onSuccess }) {
                     ) : (
                         <Box display="flex" flexDirection="column" gap={2}>
                             <TextField
-                                label="Email *"
+                                label="Email"
                                 type="email"
                                 fullWidth
                                 value={customerEmail}
@@ -356,7 +378,7 @@ export default function CreateOrderModal({ open, onClose, onSuccess }) {
                             />
                             <Box display="flex" gap={2}>
                                 <TextField
-                                    label="Voornaam *"
+                                    label="Voornaam"
                                     fullWidth
                                     value={customerFirstName}
                                     onChange={(e) => setCustomerFirstName(e.target.value)}
@@ -367,6 +389,58 @@ export default function CreateOrderModal({ open, onClose, onSuccess }) {
                                     fullWidth
                                     value={customerLastName}
                                     onChange={(e) => setCustomerLastName(e.target.value)}
+                                />
+                            </Box>
+                            <Box display="flex" gap={2}>
+                                <TextField
+                                    label="Bedrijfsnaam"
+                                    fullWidth
+                                    value={customerCompanyName}
+                                    onChange={(e) => setCustomerCompanyName(e.target.value)}
+                                />
+                                <TextField
+                                    label="Telefoon"
+                                    fullWidth
+                                    value={customerPhone}
+                                    onChange={(e) => setCustomerPhone(e.target.value)}
+                                />
+                            </Box>
+                            <TextField
+                                label="Adres"
+                                fullWidth
+                                value={customerAddress}
+                                onChange={(e) => setCustomerAddress(e.target.value)}
+                                required
+                            />
+                            <TextField
+                                label="Adres 2"
+                                fullWidth
+                                value={customerAddress2}
+                                onChange={(e) => setCustomerAddress2(e.target.value)}
+                            />
+                            <Box display="flex" gap={2}>
+                                <TextField
+                                    label="Plaats"
+                                    fullWidth
+                                    value={customerCity}
+                                    onChange={(e) => setCustomerCity(e.target.value)}
+                                    required
+                                />
+                                <TextField
+                                    label="Postcode"
+                                    fullWidth
+                                    value={customerPostalCode}
+                                    onChange={(e) => setCustomerPostalCode(e.target.value)}
+                                    required
+                                />
+                            </Box>
+                            <Box display="flex" gap={2}>
+                                <TextField
+                                    label="Land"
+                                    fullWidth
+                                    value={customerCountry}
+                                    onChange={(e) => setCustomerCountry(e.target.value)}
+                                    required
                                 />
                             </Box>
                         </Box>
@@ -381,7 +455,7 @@ export default function CreateOrderModal({ open, onClose, onSuccess }) {
                         </Typography>
                         <Button
                             size="small"
-                            startIcon={<PostAdd />}
+                            startIcon={<PostAdd/>}
                             onClick={() => setShowCreateProduct(!showCreateProduct)}
                         >
                             {showCreateProduct ? 'Bestaand product' : 'Nieuw product'}
@@ -390,7 +464,8 @@ export default function CreateOrderModal({ open, onClose, onSuccess }) {
 
                     {showCreateProduct ? (
                         // Create new product form
-                        <Box display="flex" flexDirection="column" gap={2} p={2} border={1} borderColor="divider" borderRadius={1}>
+                        <Box display="flex" flexDirection="column" gap={2} p={2} border={1} borderColor="divider"
+                             borderRadius={1}>
                             <Typography variant="subtitle2" color="primary">
                                 Nieuw Product Aanmaken
                             </Typography>
@@ -407,7 +482,7 @@ export default function CreateOrderModal({ open, onClose, onSuccess }) {
                                     value={newProductSku}
                                     onChange={(e) => setNewProductSku(e.target.value)}
                                     size="small"
-                                    sx={{ flex: 1 }}
+                                    sx={{flex: 1}}
                                     helperText="Leeg laten voor automatische generatie"
                                     placeholder="3DP-260201-A3F2"
                                 />
@@ -416,9 +491,9 @@ export default function CreateOrderModal({ open, onClose, onSuccess }) {
                                     type="number"
                                     value={newProductPrice}
                                     onChange={(e) => setNewProductPrice(e.target.value)}
-                                    inputProps={{ step: '0.01', min: '0' }}
+                                    inputProps={{step: '0.01', min: '0'}}
                                     size="small"
-                                    sx={{ flex: 1 }}
+                                    sx={{flex: 1}}
                                     InputProps={{
                                         startAdornment: <InputAdornment position="start">€</InputAdornment>,
                                     }}
@@ -482,15 +557,15 @@ export default function CreateOrderModal({ open, onClose, onSuccess }) {
                                     type="number"
                                     value={quantity}
                                     onChange={(e) => setQuantity(parseInt(e.target.value) || 1)}
-                                    inputProps={{ min: 1 }}
-                                    sx={{ width: 120 }}
+                                    inputProps={{min: 1}}
+                                    sx={{width: 120}}
                                 />
                                 <Button
                                     variant="contained"
-                                    startIcon={<AddIcon />}
+                                    startIcon={<AddIcon/>}
                                     onClick={addProductToOrder}
                                     disabled={!selectedProduct || (selectedProduct?.variations?.length > 0 && !selectedVariation)}
-                                    sx={{ height: 56 }}
+                                    sx={{height: 56}}
                                 >
                                     Toevoegen
                                 </Button>
@@ -536,8 +611,10 @@ export default function CreateOrderModal({ open, onClose, onSuccess }) {
                                             })}
                                         </Select>
                                     </FormControl>
-                                    <Typography variant="caption" color="textSecondary" sx={{ mt: 0.5, display: 'block' }}>
-                                        Dit product heeft {selectedProduct.variations.length} variatie(s). Selecteer er één om toe te voegen.
+                                    <Typography variant="caption" color="textSecondary"
+                                                sx={{mt: 0.5, display: 'block'}}>
+                                        Dit product heeft {selectedProduct.variations.length} variatie(s). Selecteer er
+                                        één om toe te voegen.
                                     </Typography>
                                 </Box>
                             )}
@@ -572,9 +649,9 @@ export default function CreateOrderModal({ open, onClose, onSuccess }) {
                                                     type="number"
                                                     value={item.quantity}
                                                     onChange={(e) => updateQuantity(item.productId, item.variationId, parseInt(e.target.value) || 0)}
-                                                    inputProps={{ min: 1 }}
+                                                    inputProps={{min: 1}}
                                                     size="small"
-                                                    sx={{ width: 80 }}
+                                                    sx={{width: 80}}
                                                 />
                                             </TableCell>
                                             <TableCell align="right">
@@ -586,7 +663,7 @@ export default function CreateOrderModal({ open, onClose, onSuccess }) {
                                                     color="error"
                                                     onClick={() => removeItem(item.productId, item.variationId)}
                                                 >
-                                                    <DeleteIcon />
+                                                    <DeleteIcon/>
                                                 </IconButton>
                                             </TableCell>
                                         </TableRow>
@@ -600,7 +677,7 @@ export default function CreateOrderModal({ open, onClose, onSuccess }) {
                                                 €{calculateTotal()}
                                             </Typography>
                                         </TableCell>
-                                        <TableCell />
+                                        <TableCell/>
                                     </TableRow>
                                 </TableBody>
                             </Table>
@@ -638,13 +715,13 @@ export default function CreateOrderModal({ open, onClose, onSuccess }) {
                 open={snackbar.open}
                 autoHideDuration={4000}
                 onClose={handleCloseSnackbar}
-                anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+                anchorOrigin={{vertical: 'bottom', horizontal: 'right'}}
             >
                 <Alert
                     onClose={handleCloseSnackbar}
                     severity={snackbar.severity}
                     variant="filled"
-                    sx={{ width: '100%' }}
+                    sx={{width: '100%'}}
                 >
                     {snackbar.message}
                 </Alert>
@@ -652,4 +729,3 @@ export default function CreateOrderModal({ open, onClose, onSuccess }) {
         </Dialog>
     );
 }
-
