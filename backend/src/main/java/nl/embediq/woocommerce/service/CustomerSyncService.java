@@ -113,8 +113,29 @@ public class CustomerSyncService {
 
     @Transactional
     public void processCustomer(WooCustomer wooCustomer) {
+        // First try to find by WooCommerce ID
         Customer customer = customerRepository.findByWooCommerceId(wooCustomer.getId())
-                .orElse(new Customer());
+                .orElse(null);
+
+        // If not found by WooCommerce ID, try to find by email
+        // This handles the case where customer was created via order first (guest checkout)
+        if (customer == null && wooCustomer.getEmail() != null && !wooCustomer.getEmail().isEmpty()) {
+            customer = customerRepository.findByEmail(wooCustomer.getEmail())
+                    .orElse(null);
+
+            // If found by email, update with WooCommerce ID
+            if (customer != null) {
+                log.debug("Found existing customer by email: {}, updating with WooCommerce ID: {}",
+                    wooCustomer.getEmail(), wooCustomer.getId());
+                customer.setWooCommerceId(wooCustomer.getId());
+            }
+        }
+
+        // If still not found, create new customer
+        if (customer == null) {
+            customer = new Customer();
+            customer.setCreatedAt(LocalDateTime.now());
+        }
 
         customer.setWooCommerceId(wooCustomer.getId());
         customer.setEmail(wooCustomer.getEmail());

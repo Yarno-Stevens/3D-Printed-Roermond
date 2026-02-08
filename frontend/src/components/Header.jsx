@@ -45,7 +45,7 @@ export default function Header() {
                 <div className="flex items-center justify-between w-full gap-4">
                     <div className="flex items-center gap-2 w-20 sm:w-60">
                         <Link to="/">
-                            <img className="h-10" src="/Logo%203D%20Printer%20los%20wit.png"
+                            <img className="h-10" src="/logo-3d-printer-los-wit.png"
                                  alt="3D-Printed-Roermond-Logo"/>
                         </Link>
                     </div>

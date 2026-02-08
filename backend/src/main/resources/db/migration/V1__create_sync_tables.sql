@@ -1,3 +1,15 @@
+SET FOREIGN_KEY_CHECKS = 0;
+DROP TABLE IF EXISTS product_variations;
+DROP TABLE IF EXISTS order_items;
+DROP TABLE IF EXISTS orders;
+DROP TABLE IF EXISTS customers;
+DROP TABLE IF EXISTS products;
+DROP TABLE IF EXISTS expenses;
+DROP TABLE IF EXISTS users;
+DROP TABLE IF EXISTS sync_status;
+DROP TABLE IF EXISTS flyway_schema_history;
+SET FOREIGN_KEY_CHECKS = 1;
+
 -- Sync status tracking
 CREATE TABLE sync_status
 (

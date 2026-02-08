@@ -17,9 +17,8 @@ import {
     VisibilityOff,
     Login as LoginIcon
 } from '@mui/icons-material';
-import axios from 'axios';
+import api from "./utils/api.js";
 
-const API_BASE_URL = 'http://localhost:8080/api';
 
 export default function Login() {
     const navigate = useNavigate();
@@ -35,7 +34,7 @@ export default function Login() {
         setLoading(true);
 
         try {
-            const response = await axios.post(`${API_BASE_URL}/auth/login`, {
+            const response = await api.post(`/auth/login`, {
                 username,
                 password
             });
@@ -70,7 +69,7 @@ export default function Login() {
                     <Box display="flex" flexDirection="column" alignItems="center" mb={3}>
                         <Box
                             component="img"
-                            src="/Logo 3D Printer los.png"
+                            src="/logo-3d-printer-los.png"
                             alt="3D Printed Roermond"
                             sx={{ height: 80, mb: 2 }}
                         />

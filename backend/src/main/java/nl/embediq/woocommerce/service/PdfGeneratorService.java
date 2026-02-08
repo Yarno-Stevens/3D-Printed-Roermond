@@ -15,6 +15,9 @@ import lombok.extern.slf4j.Slf4j;
 import nl.embediq.woocommerce.entity.Order;
 import nl.embediq.woocommerce.entity.OrderItem;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.ResourceLoader;
 
 import java.io.ByteArrayOutputStream;
 import java.math.BigDecimal;
@@ -24,6 +27,9 @@ import java.time.format.DateTimeFormatter;
 @Service
 @Slf4j
 public class PdfGeneratorService {
+
+    @Autowired
+    private ResourceLoader resourceLoader;
 
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("d MMMM yyyy");
     private static final BigDecimal BTW_RATE = new BigDecimal("0.21"); // 21% BTW
@@ -101,7 +107,8 @@ public class PdfGeneratorService {
 
         // If you have a logo, add it here:
         try {
-            Image logo = new Image(ImageDataFactory.create("src/main/resources/static/images/Logo_3dp.png"));
+            Resource resource = resourceLoader.getResource("classpath:static/images/Logo_3dp.png");
+            Image logo = new Image(ImageDataFactory.create(resource.getInputStream().readAllBytes()));
             logo.setWidth(250);
             leftCell.add(logo);
         } catch (Exception e) {
