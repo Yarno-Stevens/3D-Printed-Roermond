@@ -465,6 +465,54 @@ public class SyncMonitorController {
         return ResponseEntity.ok(orderDTOs);
     }
 
+    @PostMapping("/customers/create")
+    public ResponseEntity<?> createCustomer(@RequestBody CustomerCreateRequest request) {
+        try {
+            log.info("Creating new customer: {}", request.getEmail());
+
+            // Check if customer with this email already exists
+            if (customerRepository.findByEmail(request.getEmail()).isPresent()) {
+                return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "error", "Een klant met dit emailadres bestaat al"
+                ));
+            }
+
+            Customer customer = new Customer();
+            customer.setFirstName(request.getFirstName());
+            customer.setLastName(request.getLastName());
+            customer.setEmail(request.getEmail());
+            customer.setCompanyName(request.getCompanyName());
+            customer.setPhone(request.getPhone());
+            customer.setAddress(request.getAddress());
+            customer.setCity(request.getCity());
+            customer.setPostalCode(request.getPostalCode());
+            customer.setState(request.getState());
+            customer.setCountry(request.getCountry());
+            customer.setCreatedAt(LocalDateTime.now());
+            customer.setUpdatedAt(LocalDateTime.now());
+
+            customer = customerRepository.save(customer);
+
+            log.info("Customer created successfully with ID: {}", customer.getId());
+
+            CustomerDTO dto = convertToCustomerDTO(customer);
+
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "customer", dto,
+                "message", "Klant succesvol aangemaakt"
+            ));
+
+        } catch (Exception e) {
+            log.error("Failed to create customer", e);
+            return ResponseEntity.badRequest().body(Map.of(
+                "success", false,
+                "error", e.getMessage()
+            ));
+        }
+    }
+
     // ==================== STATS ENDPOINTS ====================
 
     @GetMapping("/stats")

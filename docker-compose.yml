@@ -39,9 +39,9 @@ services:
       CORS_ALLOWED_ORIGINS: http://localhost,http://3d-printed.local,http://192.168.101.220
 
       # WooCommerce (vul je eigen keys in!)
-      WOOCOMMERCE_URL: https://snoepshop.com
-      WOOCOMMERCE_CONSUMER_KEY: ck_17fb9adf69c8e6c62090c757c1156f5cc82b302c
-      WOOCOMMERCE_CONSUMER_SECRET: cs_84391160c4703b43e231d09f706513cf3eb16ba0
+      WOOCOMMERCE_URL: https://3d-printed.nl
+      WOOCOMMERCE_CONSUMER_KEY: ck_8dd467a12433224e4b95cdcf151425438124dafd
+      WOOCOMMERCE_CONSUMER_SECRET: cs_9351fc8840db8c919bc176dc69b7dede38293d54
 
       # Flyway
       SPRING_FLYWAY_ENABLED: "true"

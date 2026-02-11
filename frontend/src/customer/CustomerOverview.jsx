@@ -29,9 +29,11 @@ import {
     Visibility,
     Email,
     ShoppingCart,
-    GetApp
+    GetApp,
+    Add
 } from '@mui/icons-material';
 import {useNavigate} from 'react-router';
+import CreateCustomerModal from './CreateCustomerModal';
 
 
 export default function CustomersOverview() {
@@ -39,6 +41,7 @@ export default function CustomersOverview() {
     const [customers, setCustomers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [openCreateModal, setOpenCreateModal] = useState(false);
 
     // Pagination
     const [page, setPage] = useState(0);
@@ -116,10 +119,17 @@ export default function CustomersOverview() {
                 <Typography variant="h4">Klanten</Typography>
                 <Box>
                     <Button
+                        variant="contained"
+                        startIcon={<Add/>}
+                        onClick={() => setOpenCreateModal(true)}
+                        sx={{mr: 1}}
+                    >
+                        Nieuwe Klant
+                    </Button>
+                    <Button
                         variant="outlined"
                         startIcon={<Refresh/>}
                         onClick={fetchCustomers}
-                        sx={{mr: 1}}
                     >
                         Ververs
                     </Button>
@@ -316,6 +326,12 @@ export default function CustomersOverview() {
                     )}
                 </CardContent>
             </Card>
+
+            <CreateCustomerModal
+                open={openCreateModal}
+                onClose={() => setOpenCreateModal(false)}
+                onSuccess={fetchCustomers}
+            />
         </Box>
     );
 }
