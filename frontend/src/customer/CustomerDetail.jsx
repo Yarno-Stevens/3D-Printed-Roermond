@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router';
 import api from '../utils/api';
+import EditCustomerModal from './EditCustomerModal';
+import SetDiscountModal from './SetDiscountModal';
 import {
     Box,
     Card,
@@ -31,7 +33,9 @@ import {
     ShoppingCart,
     CalendarToday,
     Sync,
-    Visibility
+    Visibility,
+    Edit,
+    Percent
 } from '@mui/icons-material';
 
 
@@ -43,6 +47,8 @@ export default function CustomerDetail() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [activeTab, setActiveTab] = useState(0);
+    const [editModalOpen, setEditModalOpen] = useState(false);
+    const [discountModalOpen, setDiscountModalOpen] = useState(false);
 
     // Pagination
     const [page, setPage] = useState(0);
@@ -193,11 +199,32 @@ export default function CustomerDetail() {
                         </Typography>
                     </Box>
                 </Box>
-                {customer.wooCommerceId ? (
-                    <Chip label={`WooCommerce ID: ${customer.wooCommerceId}`} variant="outlined" />
-                ) : (
-                    <Chip label="Gast" color="default" />
-                )}
+                <Box display="flex" alignItems="center" gap={2}>
+                    {customer.wooCommerceId ? (
+                        <>
+                            <Chip label={`WooCommerce ID: ${customer.wooCommerceId}`} variant="outlined" />
+                            <Button
+                                variant="contained"
+                                startIcon={<Percent />}
+                                onClick={() => setDiscountModalOpen(true)}
+                                color="success"
+                            >
+                                Korting Instellen
+                            </Button>
+                        </>
+                    ) : (
+                        <>
+                            <Chip label="Gast" color="default" />
+                            <Button
+                                variant="contained"
+                                startIcon={<Edit />}
+                                onClick={() => setEditModalOpen(true)}
+                            >
+                                Bewerken
+                            </Button>
+                        </>
+                    )}
+                </Box>
             </Box>
 
             {/* Statistieken Cards */}
@@ -307,6 +334,19 @@ export default function CustomerDetail() {
                                         <Typography variant="body1">
                                             {customer.phone}
                                         </Typography>
+                                    </Box>
+                                )}
+                                {customer.discount && customer.discount > 0 && (
+                                    <Box mb={2}>
+                                        <Typography variant="body2" color="textSecondary" gutterBottom>
+                                            Vaste Korting
+                                        </Typography>
+                                        <Chip
+                                            label={`${Number(customer.discount).toFixed(2)}%`}
+                                            color="success"
+                                            size="medium"
+                                            sx={{ fontWeight: 'bold' }}
+                                        />
                                     </Box>
                                 )}
                                 {(customer.address || customer.address2) && (
@@ -458,6 +498,28 @@ export default function CustomerDetail() {
                     )}
                 </CardContent>
             </Card>
+
+            {/* Edit Customer Modal */}
+            <EditCustomerModal
+                open={editModalOpen}
+                onClose={() => setEditModalOpen(false)}
+                onSuccess={() => {
+                    fetchCustomerDetail();
+                    setEditModalOpen(false);
+                }}
+                customer={customer}
+            />
+
+            {/* Set Discount Modal */}
+            <SetDiscountModal
+                open={discountModalOpen}
+                onClose={() => setDiscountModalOpen(false)}
+                onSuccess={() => {
+                    fetchCustomerDetail();
+                    setDiscountModalOpen(false);
+                }}
+                customer={customer}
+            />
         </Box>
     );
 }

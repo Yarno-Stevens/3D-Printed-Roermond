@@ -1,6 +1,7 @@
 package nl.embediq.woocommerce.dto;
 
 import lombok.Data;
+import java.math.BigDecimal;
 
 @Data
 public class CustomerCreateRequest {
@@ -14,5 +15,6 @@ public class CustomerCreateRequest {
     private String postalCode;
     private String state;
     private String country;
+    private BigDecimal discount;
 }
 

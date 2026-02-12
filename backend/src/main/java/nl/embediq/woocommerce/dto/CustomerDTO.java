@@ -1,6 +1,7 @@
 package nl.embediq.woocommerce.dto;
 
 import lombok.Data;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Data
@@ -18,6 +19,7 @@ public class CustomerDTO {
     private String postalCode;
     private String state;
     private String country;
+    private BigDecimal discount;
     private LocalDateTime createdAt;
     private LocalDateTime lastSyncedAt;
 }

@@ -12,6 +12,9 @@ public class OrderDTO {
     private Long wooCommerceId;
     private String orderNumber;
     private String status;
+    private BigDecimal subtotal;
+    private BigDecimal discountPercentage;
+    private BigDecimal discountAmount;
     private BigDecimal total;
     private LocalDateTime createdAt;
     private LocalDateTime syncedAt;

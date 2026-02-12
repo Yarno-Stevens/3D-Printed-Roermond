@@ -23,6 +23,7 @@ import java.io.ByteArrayOutputStream;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.format.DateTimeFormatter;
+import java.util.Locale;
 
 @Service
 @Slf4j
@@ -31,7 +32,7 @@ public class PdfGeneratorService {
     @Autowired
     private ResourceLoader resourceLoader;
 
-    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("d MMMM yyyy");
+    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("d MMMM yyyy", new Locale("nl", "NL"));
     private static final BigDecimal BTW_RATE = new BigDecimal("0.21"); // 21% BTW
 
     // Company details
@@ -298,6 +299,34 @@ public class PdfGeneratorService {
                 .useAllAvailableWidth()
                 .setBorder(Border.NO_BORDER);
 
+        // Subtotal (before discount)
+        BigDecimal subtotal = order.getSubtotal() != null ? order.getSubtotal() : order.getTotal();
+
+        totalsTable.addCell(new Cell()
+                .add(new Paragraph("Subtotaal:").setFontSize(9))
+                .setTextAlignment(TextAlignment.RIGHT)
+                .setBorder(Border.NO_BORDER)
+                .setPaddingTop(5));
+
+        totalsTable.addCell(new Cell()
+                .add(new Paragraph(formatCurrency(subtotal)).setFontSize(9))
+                .setTextAlignment(TextAlignment.RIGHT)
+                .setBorder(Border.NO_BORDER)
+                .setPaddingTop(5));
+
+        // Discount (if applicable)
+        if (order.getDiscountPercentage() != null && order.getDiscountPercentage().compareTo(BigDecimal.ZERO) > 0) {
+            totalsTable.addCell(new Cell()
+                    .add(new Paragraph("Korting (" + order.getDiscountPercentage().stripTrailingZeros().toPlainString() + "%):").setFontSize(9))
+                    .setTextAlignment(TextAlignment.RIGHT)
+                    .setBorder(Border.NO_BORDER));
+
+            totalsTable.addCell(new Cell()
+                    .add(new Paragraph("-" + formatCurrency(order.getDiscountAmount())).setFontSize(9))
+                    .setTextAlignment(TextAlignment.RIGHT)
+                    .setBorder(Border.NO_BORDER));
+        }
+
         // Calculate BTW
         BigDecimal totalInclBtw = order.getTotal();
         BigDecimal btwAmount = totalInclBtw.subtract(
@@ -308,12 +337,14 @@ public class PdfGeneratorService {
         totalsTable.addCell(new Cell()
                 .add(new Paragraph("Totaal incl. BTW:").setFontSize(10).setBold())
                 .setTextAlignment(TextAlignment.RIGHT)
-                .setBorder(Border.NO_BORDER));
+                .setBorder(Border.NO_BORDER)
+                .setPaddingTop(5));
 
         totalsTable.addCell(new Cell()
                 .add(new Paragraph(formatCurrency(totalInclBtw)).setFontSize(10).setBold())
                 .setTextAlignment(TextAlignment.RIGHT)
-                .setBorder(Border.NO_BORDER));
+                .setBorder(Border.NO_BORDER)
+                .setPaddingTop(5));
 
         // BTW amount
         totalsTable.addCell(new Cell()

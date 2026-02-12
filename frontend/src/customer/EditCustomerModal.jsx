@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     Dialog,
     DialogTitle,
@@ -15,11 +15,11 @@ import {
 } from '@mui/material';
 import {
     Close as CloseIcon,
-    PersonAdd as PersonAddIcon
+    Edit as EditIcon
 } from '@mui/icons-material';
 import api from '../utils/api';
 
-export default function CreateCustomerModal({ open, onClose, onSuccess }) {
+export default function EditCustomerModal({ open, onClose, onSuccess, customer }) {
     const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
 
     // Customer fields
@@ -32,10 +32,27 @@ export default function CreateCustomerModal({ open, onClose, onSuccess }) {
     const [city, setCity] = useState('');
     const [postalCode, setPostalCode] = useState('');
     const [state, setState] = useState('');
-    const [country, setCountry] = useState('Nederland');
+    const [country, setCountry] = useState('');
     const [discount, setDiscount] = useState(0);
 
     const [loading, setLoading] = useState(false);
+
+    // Load customer data when modal opens
+    useEffect(() => {
+        if (customer && open) {
+            setFirstName(customer.firstName || '');
+            setLastName(customer.lastName || '');
+            setEmail(customer.email || '');
+            setCompanyName(customer.companyName || '');
+            setPhone(customer.phone || '');
+            setAddress(customer.address || '');
+            setCity(customer.city || '');
+            setPostalCode(customer.postalCode || '');
+            setState(customer.state || '');
+            setCountry(customer.country || 'Nederland');
+            setDiscount(customer.discount || 0);
+        }
+    }, [customer, open]);
 
     const showMessage = (message, severity = 'success') => {
         setSnackbar({ open: true, message, severity });
@@ -72,33 +89,26 @@ export default function CreateCustomerModal({ open, onClose, onSuccess }) {
                 discount: parseFloat(discount) || 0
             };
 
-            await api.post('/admin/sync/customers/create', requestData);
+            await api.put(`/admin/sync/customers/${customer.id}`, requestData);
 
-            showMessage(`Klant "${firstName} ${lastName}" succesvol aangemaakt!`, 'success');
+            showMessage(`Klant "${firstName} ${lastName}" succesvol bijgewerkt!`, 'success');
             onSuccess();
             handleClose();
         } catch (error) {
-            console.error('Failed to create customer:', error);
-            showMessage('Fout bij aanmaken klant: ' + (error.response?.data?.error || error.message), 'error');
+            console.error('Failed to update customer:', error);
+            showMessage('Fout bij bijwerken klant: ' + (error.response?.data?.error || error.message), 'error');
         } finally {
             setLoading(false);
         }
     };
 
     const handleClose = () => {
-        setFirstName('');
-        setLastName('');
-        setEmail('');
-        setCompanyName('');
-        setPhone('');
-        setAddress('');
-        setCity('');
-        setPostalCode('');
-        setState('');
-        setCountry('Nederland');
-        setDiscount(0);
         onClose();
     };
+
+    if (!customer) {
+        return null;
+    }
 
     return (
         <>
@@ -106,8 +116,8 @@ export default function CreateCustomerModal({ open, onClose, onSuccess }) {
                 <DialogTitle>
                     <Box display="flex" alignItems="center" justifyContent="space-between">
                         <Box display="flex" alignItems="center" gap={1}>
-                            <PersonAddIcon />
-                            <span>Nieuwe Klant Aanmaken</span>
+                            <EditIcon />
+                            <span>Klant Bewerken</span>
                         </Box>
                         <IconButton onClick={handleClose}>
                             <CloseIcon />
@@ -257,7 +267,7 @@ export default function CreateCustomerModal({ open, onClose, onSuccess }) {
                         variant="contained"
                         disabled={loading}
                     >
-                        {loading ? 'Aanmaken...' : 'Aanmaken'}
+                        {loading ? 'Opslaan...' : 'Opslaan'}
                     </Button>
                 </DialogActions>
             </Dialog>
@@ -275,3 +285,4 @@ export default function CreateCustomerModal({ open, onClose, onSuccess }) {
         </>
     );
 }
+

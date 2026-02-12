@@ -25,6 +25,15 @@ public class Order {
     @Column(name = "order_number")
     private String orderNumber;
     
+    @Column(name = "subtotal")
+    private BigDecimal subtotal;
+
+    @Column(name = "discount_percentage")
+    private BigDecimal discountPercentage = BigDecimal.ZERO;
+
+    @Column(name = "discount_amount")
+    private BigDecimal discountAmount = BigDecimal.ZERO;
+
     @Column(name = "total")
     private BigDecimal total;
     

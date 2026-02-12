@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router';
 import api from '../utils/api';
 import { useSnackbar } from '../utils/useSnackbar';
+import EditOrderModal from './EditOrderModal';
 import {
     Box,
     Card,
@@ -21,7 +22,12 @@ import {
     CircularProgress,
     Alert,
     IconButton,
-    Snackbar
+    Snackbar,
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    DialogContentText,
+    DialogActions
 } from '@mui/material';
 import {
     ArrowBack,
@@ -34,7 +40,9 @@ import {
     AccessTime,
     Sync,
     PictureAsPdf,
-    Download
+    Download,
+    Edit,
+    Delete
     } from '@mui/icons-material';
 
 
@@ -45,6 +53,9 @@ export default function OrderDetail() {
     const [order, setOrder] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [editModalOpen, setEditModalOpen] = useState(false);
+    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+    const [deleting, setDeleting] = useState(false);
 
     useEffect(() => {
         fetchOrderDetail();
@@ -82,6 +93,24 @@ export default function OrderDetail() {
         } catch (error) {
             console.error('Failed to download PDF:', error);
             showError('Fout bij downloaden PDF: ' + (error.response?.data?.error || error.message));
+        }
+    };
+
+    const handleDeleteOrder = async () => {
+        setDeleting(true);
+        try {
+            await api.delete(`/admin/sync/orders/${id}`);
+
+            // Show success message and navigate back
+            navigate('/orders', {
+                state: { message: `Order #${order.orderNumber} succesvol verwijderd` }
+            });
+        } catch (error) {
+            console.error('Failed to delete order:', error);
+            showError('Fout bij verwijderen order: ' + (error.response?.data?.error || error.message));
+            setDeleteDialogOpen(false);
+        } finally {
+            setDeleting(false);
         }
     };
 
@@ -163,12 +192,33 @@ export default function OrderDetail() {
                     </IconButton>
                     <Box>
                         <Typography variant="h4">Order #{order.orderNumber}</Typography>
-                        <Typography variant="body2" color="textSecondary">
-                            WooCommerce ID: {order.wooCommerceId}
-                        </Typography>
+                        {order.wooCommerceId && (
+                            <Typography variant="body2" color="textSecondary">
+                                WooCommerce ID: {order.wooCommerceId}
+                            </Typography>
+                        )}
                     </Box>
                 </Box>
                 <Box display="flex" alignItems="center" gap={2}>
+                    {!order.wooCommerceId && (
+                        <>
+                            <Button
+                                variant="outlined"
+                                color="error"
+                                startIcon={<Delete />}
+                                onClick={() => setDeleteDialogOpen(true)}
+                            >
+                                Verwijderen
+                            </Button>
+                            <Button
+                                variant="outlined"
+                                startIcon={<Edit />}
+                                onClick={() => setEditModalOpen(true)}
+                            >
+                                Bewerken
+                            </Button>
+                        </>
+                    )}
                     <Button
                         variant="contained"
                         startIcon={<PictureAsPdf />}
@@ -323,6 +373,35 @@ export default function OrderDetail() {
                                                     </TableCell>
                                                 </TableRow>
                                             ))}
+                                            {/* Subtotal Row */}
+                                            <TableRow>
+                                                <TableCell colSpan={2} align="right">
+                                                    <Typography variant="body1">
+                                                        Subtotaal:
+                                                    </Typography>
+                                                </TableCell>
+                                                <TableCell align="right">
+                                                    <Typography variant="body1">
+                                                        {formatCurrency(order.subtotal || order.total)}
+                                                    </Typography>
+                                                </TableCell>
+                                            </TableRow>
+                                            {/* Discount Row (if applicable) */}
+                                            {order.discountPercentage > 0 && (
+                                                <TableRow>
+                                                    <TableCell colSpan={2} align="right">
+                                                        <Typography variant="body1" color="success.main">
+                                                            Korting ({Number(order.discountPercentage).toFixed(2)}%):
+                                                        </Typography>
+                                                    </TableCell>
+                                                    <TableCell align="right">
+                                                        <Typography variant="body1" color="success.main">
+                                                            -{formatCurrency(order.discountAmount)}
+                                                        </Typography>
+                                                    </TableCell>
+                                                </TableRow>
+                                            )}
+                                            {/* Total Row */}
                                             <TableRow>
                                                 <TableCell colSpan={2} align="right">
                                                     <Typography variant="h6" fontWeight="bold">
@@ -428,6 +507,51 @@ export default function OrderDetail() {
                     {snackbar.message}
                 </Alert>
             </Snackbar>
+
+            {/* Edit Order Modal */}
+            <EditOrderModal
+                open={editModalOpen}
+                onClose={() => setEditModalOpen(false)}
+                onSuccess={() => {
+                    fetchOrderDetail();
+                    setEditModalOpen(false);
+                }}
+                order={order}
+            />
+
+            {/* Delete Confirmation Dialog */}
+            <Dialog
+                open={deleteDialogOpen}
+                onClose={() => !deleting && setDeleteDialogOpen(false)}
+            >
+                <DialogTitle>
+                    Order Verwijderen
+                </DialogTitle>
+                <DialogContent>
+                    <DialogContentText>
+                        Weet je zeker dat je order <strong>#{order?.orderNumber}</strong> wilt verwijderen?
+                        <br /><br />
+                        Deze actie kan niet ongedaan worden gemaakt.
+                    </DialogContentText>
+                </DialogContent>
+                <DialogActions>
+                    <Button
+                        onClick={() => setDeleteDialogOpen(false)}
+                        disabled={deleting}
+                    >
+                        Annuleren
+                    </Button>
+                    <Button
+                        onClick={handleDeleteOrder}
+                        color="error"
+                        variant="contained"
+                        disabled={deleting}
+                        startIcon={deleting ? <CircularProgress size={20} /> : <Delete />}
+                    >
+                        {deleting ? 'Verwijderen...' : 'Verwijderen'}
+                    </Button>
+                </DialogActions>
+            </Dialog>
         </Box>
     );
 }

@@ -489,6 +489,7 @@ public class SyncMonitorController {
             customer.setPostalCode(request.getPostalCode());
             customer.setState(request.getState());
             customer.setCountry(request.getCountry());
+            customer.setDiscount(request.getDiscount() != null ? request.getDiscount() : BigDecimal.ZERO);
             customer.setCreatedAt(LocalDateTime.now());
             customer.setUpdatedAt(LocalDateTime.now());
 
@@ -506,6 +507,112 @@ public class SyncMonitorController {
 
         } catch (Exception e) {
             log.error("Failed to create customer", e);
+            return ResponseEntity.badRequest().body(Map.of(
+                "success", false,
+                "error", e.getMessage()
+            ));
+        }
+    }
+
+    @PutMapping("/customers/{id}")
+    public ResponseEntity<?> updateCustomer(
+            @PathVariable Long id,
+            @RequestBody CustomerCreateRequest request) {
+        try {
+            Customer customer = customerRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Customer not found"));
+
+            log.info("Updating customer ID: {}", id);
+
+            // Only allow updating customers that are not synced from WooCommerce
+            if (customer.getWooCommerceId() != null) {
+                return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "error", "Kan geen klanten aanpassen die gesynchroniseerd zijn vanuit WooCommerce"
+                ));
+            }
+
+            // Update fields
+            customer.setFirstName(request.getFirstName());
+            customer.setLastName(request.getLastName());
+            customer.setEmail(request.getEmail());
+            customer.setCompanyName(request.getCompanyName());
+            customer.setPhone(request.getPhone());
+            customer.setAddress(request.getAddress());
+            customer.setCity(request.getCity());
+            customer.setPostalCode(request.getPostalCode());
+            customer.setState(request.getState());
+            customer.setCountry(request.getCountry());
+            customer.setDiscount(request.getDiscount() != null ? request.getDiscount() : BigDecimal.ZERO);
+            customer.setUpdatedAt(LocalDateTime.now());
+
+            customer = customerRepository.save(customer);
+
+            log.info("Customer updated successfully: {}", id);
+
+            CustomerDTO dto = convertToCustomerDTO(customer);
+
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "customer", dto,
+                "message", "Klant succesvol bijgewerkt"
+            ));
+
+        } catch (Exception e) {
+            log.error("Failed to update customer", e);
+            return ResponseEntity.badRequest().body(Map.of(
+                "success", false,
+                "error", e.getMessage()
+            ));
+        }
+    }
+
+    @PatchMapping("/customers/{id}/discount")
+    public ResponseEntity<?> updateCustomerDiscount(
+            @PathVariable Long id,
+            @RequestBody Map<String, Object> request) {
+        try {
+            Customer customer = customerRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Customer not found"));
+
+            log.info("Updating discount for customer ID: {}", id);
+
+            // Extract discount from request
+            Object discountObj = request.get("discount");
+            BigDecimal discount = BigDecimal.ZERO;
+
+            if (discountObj != null) {
+                if (discountObj instanceof Number) {
+                    discount = new BigDecimal(discountObj.toString());
+                } else if (discountObj instanceof String) {
+                    discount = new BigDecimal((String) discountObj);
+                }
+            }
+
+            // Validate discount range
+            if (discount.compareTo(BigDecimal.ZERO) < 0 || discount.compareTo(new BigDecimal(100)) > 0) {
+                return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "error", "Korting moet tussen 0 en 100 zijn"
+                ));
+            }
+
+            customer.setDiscount(discount);
+            customer.setUpdatedAt(LocalDateTime.now());
+            customer = customerRepository.save(customer);
+
+            log.info("Customer discount updated successfully: {} -> {}%", id, discount);
+
+            CustomerDTO dto = convertToCustomerDTO(customer);
+
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "customer", dto,
+                "message", "Korting succesvol bijgewerkt"
+            ));
+
+        } catch (Exception e) {
+            log.error("Failed to update customer discount", e);
             return ResponseEntity.badRequest().body(Map.of(
                 "success", false,
                 "error", e.getMessage()
@@ -616,6 +723,9 @@ public class SyncMonitorController {
         dto.setWooCommerceId(order.getWooCommerceId());
         dto.setOrderNumber(order.getOrderNumber());
         dto.setStatus(order.getStatus().toString());
+        dto.setSubtotal(order.getSubtotal());
+        dto.setDiscountPercentage(order.getDiscountPercentage());
+        dto.setDiscountAmount(order.getDiscountAmount());
         dto.setTotal(order.getTotal());
         dto.setCreatedAt(order.getCreatedAt());
         dto.setSyncedAt(order.getLastSyncedAt());
@@ -681,6 +791,7 @@ public class SyncMonitorController {
         dto.setPostalCode(customer.getPostalCode());
         dto.setState(customer.getState());
         dto.setCountry(customer.getCountry());
+        dto.setDiscount(customer.getDiscount());
         dto.setCreatedAt(customer.getCreatedAt());
         dto.setLastSyncedAt(customer.getLastSyncedAt());
         return dto;
@@ -764,12 +875,21 @@ public class SyncMonitorController {
             order.setStatus(nl.embediq.woocommerce.enums.OrderStatus.PENDING);
             order.setCreatedAt(LocalDateTime.now());
 
-            // Calculate total
-            BigDecimal total = BigDecimal.ZERO;
+            // Calculate subtotal
+            BigDecimal subtotal = BigDecimal.ZERO;
             for (OrderCreateRequest.OrderItemRequest itemReq : request.getItems()) {
                 BigDecimal itemTotal = itemReq.getPrice().multiply(new BigDecimal(itemReq.getQuantity()));
-                total = total.add(itemTotal);
+                subtotal = subtotal.add(itemTotal);
             }
+            order.setSubtotal(subtotal);
+
+            // Apply customer discount if exists
+            BigDecimal discountPercentage = customer.getDiscount() != null ? customer.getDiscount() : BigDecimal.ZERO;
+            BigDecimal discountAmount = subtotal.multiply(discountPercentage).divide(new BigDecimal(100), 2, java.math.RoundingMode.HALF_UP);
+            BigDecimal total = subtotal.subtract(discountAmount);
+
+            order.setDiscountPercentage(discountPercentage);
+            order.setDiscountAmount(discountAmount);
             order.setTotal(total);
 
             order = orderRepository.save(order);
@@ -798,6 +918,167 @@ public class SyncMonitorController {
 
         } catch (Exception e) {
             log.error("Failed to create order", e);
+            return ResponseEntity.badRequest().body(Map.of(
+                "success", false,
+                "error", e.getMessage()
+            ));
+        }
+    }
+
+    @PutMapping("/orders/{id}")
+    public ResponseEntity<?> updateOrder(
+            @PathVariable Long id,
+            @RequestBody OrderUpdateRequest request) {
+        try {
+            Order order = orderRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Order not found"));
+
+            log.info("Updating order ID: {}", id);
+
+            // Only allow updating non-WooCommerce orders
+            if (order.getWooCommerceId() != null) {
+                return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "error", "Kan geen orders aanpassen die gesynchroniseerd zijn vanuit WooCommerce"
+                ));
+            }
+
+            // Update customer if changed
+            if (request.getCustomerId() != null && !request.getCustomerId().equals(order.getCustomer().getId())) {
+                Customer customer = customerRepository.findById(request.getCustomerId())
+                    .orElseThrow(() -> new RuntimeException("Customer not found"));
+                order.setCustomer(customer);
+            }
+
+            // Update status if provided
+            if (request.getStatus() != null) {
+                order.setStatus(nl.embediq.woocommerce.enums.OrderStatus.valueOf(request.getStatus().toUpperCase().replace("-", "_")));
+            }
+
+            // Clear existing items
+            order.getItems().clear();
+            orderRepository.save(order);
+
+            // Add new items
+            BigDecimal subtotal = BigDecimal.ZERO;
+            for (OrderUpdateRequest.OrderItemRequest itemReq : request.getItems()) {
+                nl.embediq.woocommerce.entity.OrderItem orderItem = new nl.embediq.woocommerce.entity.OrderItem();
+                orderItem.setOrder(order);
+                orderItem.setProductId(itemReq.getProductId());
+                orderItem.setProductName(itemReq.getProductName());
+                orderItem.setQuantity(itemReq.getQuantity());
+                BigDecimal itemTotal = itemReq.getPrice().multiply(new BigDecimal(itemReq.getQuantity()));
+                orderItem.setTotal(itemTotal);
+                subtotal = subtotal.add(itemTotal);
+                order.getItems().add(orderItem);
+            }
+
+            // Recalculate totals with customer discount
+            order.setSubtotal(subtotal);
+            BigDecimal discountPercentage = order.getCustomer().getDiscount() != null ? order.getCustomer().getDiscount() : BigDecimal.ZERO;
+            BigDecimal discountAmount = subtotal.multiply(discountPercentage).divide(new BigDecimal(100), 2, java.math.RoundingMode.HALF_UP);
+            BigDecimal total = subtotal.subtract(discountAmount);
+
+            order.setDiscountPercentage(discountPercentage);
+            order.setDiscountAmount(discountAmount);
+            order.setTotal(total);
+            order.setUpdatedAt(LocalDateTime.now());
+
+            order = orderRepository.save(order);
+
+            log.info("Order updated successfully: {}", id);
+
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "message", "Order updated successfully"
+            ));
+
+        } catch (Exception e) {
+            log.error("Failed to update order", e);
+            return ResponseEntity.badRequest().body(Map.of(
+                "success", false,
+                "error", e.getMessage()
+            ));
+        }
+    }
+
+    @DeleteMapping("/orders/{id}")
+    public ResponseEntity<?> deleteOrder(@PathVariable Long id) {
+        try {
+            Order order = orderRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Order not found"));
+
+            log.info("Deleting order ID: {}", id);
+
+            // Only allow deleting non-WooCommerce orders
+            if (order.getWooCommerceId() != null) {
+                return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "error", "Kan geen orders verwijderen die gesynchroniseerd zijn vanuit WooCommerce"
+                ));
+            }
+
+            String orderNumber = order.getOrderNumber();
+            orderRepository.delete(order);
+
+            log.info("Order deleted successfully: {} ({})", id, orderNumber);
+
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "message", "Order succesvol verwijderd"
+            ));
+
+        } catch (Exception e) {
+            log.error("Failed to delete order", e);
+            return ResponseEntity.badRequest().body(Map.of(
+                "success", false,
+                "error", e.getMessage()
+            ));
+        }
+    }
+
+    @DeleteMapping("/orders/{orderId}/items/{itemId}")
+    public ResponseEntity<?> deleteOrderItem(
+            @PathVariable Long orderId,
+            @PathVariable Long itemId) {
+        try {
+            Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new RuntimeException("Order not found"));
+
+            // Only allow updating non-WooCommerce orders
+            if (order.getWooCommerceId() != null) {
+                return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "error", "Kan geen items verwijderen van orders die gesynchroniseerd zijn vanuit WooCommerce"
+                ));
+            }
+
+            order.getItems().removeIf(item -> item.getId().equals(itemId));
+
+            // Recalculate totals
+            BigDecimal subtotal = order.getItems().stream()
+                .map(nl.embediq.woocommerce.entity.OrderItem::getTotal)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+            order.setSubtotal(subtotal);
+            BigDecimal discountPercentage = order.getCustomer().getDiscount() != null ? order.getCustomer().getDiscount() : BigDecimal.ZERO;
+            BigDecimal discountAmount = subtotal.multiply(discountPercentage).divide(new BigDecimal(100), 2, java.math.RoundingMode.HALF_UP);
+            BigDecimal total = subtotal.subtract(discountAmount);
+
+            order.setDiscountPercentage(discountPercentage);
+            order.setDiscountAmount(discountAmount);
+            order.setTotal(total);
+            order.setUpdatedAt(LocalDateTime.now());
+
+            orderRepository.save(order);
+
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "message", "Order item deleted successfully"
+            ));
+
+        } catch (Exception e) {
+            log.error("Failed to delete order item", e);
             return ResponseEntity.badRequest().body(Map.of(
                 "success", false,
                 "error", e.getMessage()
