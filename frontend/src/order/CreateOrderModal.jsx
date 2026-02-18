@@ -67,6 +67,11 @@ export default function CreateOrderModal({open, onClose, onSuccess}) {
     const [quantity, setQuantity] = useState(1);
     const [searchQuery, setSearchQuery] = useState('');
 
+    // Variation filter state
+    const [variationAttributes, setVariationAttributes] = useState({}); // {attributeName: selectedValue}
+    const [availableAttributes, setAvailableAttributes] = useState([]); // List of unique attributes
+    const [filteredVariations, setFilteredVariations] = useState([]);
+
     // Create product state
     const [showCreateProduct, setShowCreateProduct] = useState(false);
     const [newProductName, setNewProductName] = useState('');
@@ -82,6 +87,103 @@ export default function CreateOrderModal({open, onClose, onSuccess}) {
             fetchCustomers();
         }
     }, [open, searchQuery, customerSearchQuery]);
+
+    // Extract available attributes when product is selected
+    useEffect(() => {
+        if (selectedProduct && selectedProduct.variations && selectedProduct.variations.length > 0) {
+            extractAvailableAttributes();
+        } else {
+            setAvailableAttributes([]);
+            setVariationAttributes({});
+            setFilteredVariations([]);
+        }
+    }, [selectedProduct]);
+
+    // Filter variations when attribute filters change
+    useEffect(() => {
+        if (selectedProduct && selectedProduct.variations) {
+            filterVariations();
+        }
+    }, [variationAttributes, selectedProduct]);
+
+    const extractAvailableAttributes = () => {
+        const variations = selectedProduct.variations;
+        const attributeMap = {};
+
+        variations.forEach(variation => {
+            try {
+                const attrs = JSON.parse(variation.attributes);
+                attrs.forEach(attr => {
+                    if (!attributeMap[attr.name]) {
+                        attributeMap[attr.name] = new Set();
+                    }
+                    attributeMap[attr.name].add(attr.option);
+                });
+            } catch (e) {
+                // Skip invalid JSON
+            }
+        });
+
+        // Convert to array format
+        const attributes = Object.keys(attributeMap).map(name => ({
+            name: name,
+            options: Array.from(attributeMap[name]).sort()
+        }));
+
+        setAvailableAttributes(attributes);
+
+        // Initialize filters to empty
+        const initialFilters = {};
+        attributes.forEach(attr => {
+            initialFilters[attr.name] = '';
+        });
+        setVariationAttributes(initialFilters);
+    };
+
+    const filterVariations = () => {
+        const variations = selectedProduct.variations;
+
+        // If no filters set, show all
+        const hasFilters = Object.values(variationAttributes).some(val => val !== '');
+
+        if (!hasFilters) {
+            setFilteredVariations(variations);
+            setSelectedVariation(null);
+            return;
+        }
+
+        // Filter based on selected attributes
+        const filtered = variations.filter(variation => {
+            try {
+                const attrs = JSON.parse(variation.attributes);
+
+                return Object.entries(variationAttributes).every(([attrName, selectedValue]) => {
+                    if (selectedValue === '') return true; // No filter for this attribute
+
+                    const varAttr = attrs.find(a => a.name === attrName);
+                    return varAttr && varAttr.option === selectedValue;
+                });
+            } catch (e) {
+                return false;
+            }
+        });
+
+        setFilteredVariations(filtered);
+
+        // Auto-select if only one match
+        if (filtered.length === 1) {
+            setSelectedVariation(filtered[0]);
+        } else {
+            setSelectedVariation(null);
+        }
+    };
+
+    const handleAttributeChange = (attributeName, value) => {
+        setVariationAttributes(prev => ({
+            ...prev,
+            [attributeName]: value
+        }));
+    };
 
     const fetchProducts = async () => {
         try {
@@ -149,6 +251,9 @@ export default function CreateOrderModal({open, onClose, onSuccess}) {
         setSelectedVariation(null);
         setQuantity(1);
         setSearchQuery('');
+        setVariationAttributes({});
+        setAvailableAttributes([]);
+        setFilteredVariations([]);
     };
 
     const parseVariationAttributes = (attributesJson) => {
@@ -298,6 +403,9 @@ export default function CreateOrderModal({open, onClose, onSuccess}) {
         setSelectedVariation(null);
         setQuantity(1);
         setSearchQuery('');
+        setVariationAttributes({});
+        setAvailableAttributes([]);
+        setFilteredVariations([]);
         setShowCreateProduct(false);
         setNewProductName('');
         setNewProductSku('');
@@ -574,48 +682,87 @@ export default function CreateOrderModal({open, onClose, onSuccess}) {
                             {/* Variation selector - only show if product has variations */}
                             {selectedProduct && selectedProduct.variations && selectedProduct.variations.length > 0 && (
                                 <Box>
-                                    <FormControl fullWidth size="small">
-                                        <InputLabel>Selecteer variatie *</InputLabel>
-                                        <Select
-                                            value={selectedVariation?.id || ''}
-                                            onChange={(e) => {
-                                                const variation = selectedProduct.variations.find(v => v.id === e.target.value);
-                                                setSelectedVariation(variation);
-                                            }}
-                                            label="Selecteer variatie *"
-                                        >
-                                            {selectedProduct.variations.map((variation) => {
-                                                const attrs = variation.attributes ?
-                                                    (() => {
-                                                        try {
-                                                            const parsed = JSON.parse(variation.attributes);
-                                                            return parsed.map(a => `${a.name}: ${a.option}`).join(', ');
-                                                        } catch {
-                                                            return variation.attributes;
-                                                        }
-                                                    })() :
-                                                    variation.sku || `Variatie ${variation.id}`;
-
-                                                return (
-                                                    <MenuItem key={variation.id} value={variation.id}>
-                                                        <Box>
-                                                            <Typography variant="body2">
-                                                                {attrs}
-                                                            </Typography>
-                                                            <Typography variant="caption" color="textSecondary">
-                                                                €{variation.price} {variation.sku && `| SKU: ${variation.sku}`}
-                                                            </Typography>
-                                                        </Box>
-                                                    </MenuItem>
-                                                );
-                                            })}
-                                        </Select>
-                                    </FormControl>
-                                    <Typography variant="caption" color="textSecondary"
-                                                sx={{mt: 0.5, display: 'block'}}>
-                                        Dit product heeft {selectedProduct.variations.length} variatie(s). Selecteer er
-                                        één om toe te voegen.
+                                    <Typography variant="subtitle2" gutterBottom sx={{ mt: 2 }}>
+                                        Variatie Filters
                                     </Typography>
+                                    <Typography variant="caption" color="textSecondary" display="block" gutterBottom>
+                                        Selecteer opties om de variaties te filteren ({filteredVariations.length} van {selectedProduct.variations.length} variaties getoond)
+                                    </Typography>
+
+                                    {/* Attribute Filter Dropdowns */}
+                                    <Box display="flex" flexDirection="column" gap={2} mb={2}>
+                                        {availableAttributes.map((attribute) => (
+                                            <FormControl key={attribute.name} fullWidth size="small">
+                                                <InputLabel>{attribute.name}</InputLabel>
+                                                <Select
+                                                    value={variationAttributes[attribute.name] || ''}
+                                                    onChange={(e) => handleAttributeChange(attribute.name, e.target.value)}
+                                                    label={attribute.name}
+                                                >
+                                                    <MenuItem value="">
+                                                        <em>Alle</em>
+                                                    </MenuItem>
+                                                    {attribute.options.map((option) => (
+                                                        <MenuItem key={option} value={option}>
+                                                            {option}
+                                                        </MenuItem>
+                                                    ))}
+                                                </Select>
+                                            </FormControl>
+                                        ))}
+                                    </Box>
+
+                                    {/* Filtered Variations List */}
+                                    {filteredVariations.length > 0 && (
+                                        <Box>
+                                            <Typography variant="subtitle2" gutterBottom>
+                                                Selecteer Variatie
+                                            </Typography>
+                                            <FormControl fullWidth size="small">
+                                                <InputLabel>Variatie *</InputLabel>
+                                                <Select
+                                                    value={selectedVariation?.id || ''}
+                                                    onChange={(e) => {
+                                                        const variation = filteredVariations.find(v => v.id === e.target.value);
+                                                        setSelectedVariation(variation);
+                                                    }}
+                                                    label="Variatie *"
+                                                >
+                                                    {filteredVariations.map((variation) => {
+                                                        const attrs = variation.attributes ?
+                                                            (() => {
+                                                                try {
+                                                                    const parsed = JSON.parse(variation.attributes);
+                                                                    return parsed.map(a => `${a.name}: ${a.option}`).join(', ');
+                                                                } catch {
+                                                                    return variation.attributes;
+                                                                }
+                                                            })() :
+                                                            variation.sku || `Variatie ${variation.id}`;
+
+                                                        return (
+                                                            <MenuItem key={variation.id} value={variation.id}>
+                                                                <Box>
+                                                                    <Typography variant="body2">
+                                                                        {attrs}
+                                                                    </Typography>
+                                                                    <Typography variant="caption" color="textSecondary">
+                                                                        €{variation.price} {variation.sku && `| SKU: ${variation.sku}`}
+                                                                    </Typography>
+                                                                </Box>
+                                                            </MenuItem>
+                                                        );
+                                                    })}
+                                                </Select>
+                                            </FormControl>
+                                        </Box>
+                                    )}
+
+                                    {filteredVariations.length === 0 && Object.values(variationAttributes).some(v => v !== '') && (
+                                        <Alert severity="warning">
+                                            Geen variaties gevonden met de geselecteerde filters. Pas je filters aan.
+                                        </Alert>
+                                    )}
                                 </Box>
                             )}
                         </Box>
@@ -729,3 +876,4 @@ export default function CreateOrderModal({open, onClose, onSuccess}) {
         </Dialog>
     );
 }
+

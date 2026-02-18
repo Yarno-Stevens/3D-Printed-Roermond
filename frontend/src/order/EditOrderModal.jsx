@@ -19,7 +19,11 @@ import {
     Snackbar,
     Alert,
     Paper,
-    Chip
+    Chip,
+    FormControl,
+    InputLabel,
+    Select,
+    MenuItem
 } from '@mui/material';
 import {
     Close as CloseIcon,
@@ -36,7 +40,14 @@ export default function EditOrderModal({ open, onClose, onSuccess, order }) {
     const [items, setItems] = useState([]);
     const [products, setProducts] = useState([]);
     const [selectedProduct, setSelectedProduct] = useState(null);
+    const [selectedVariation, setSelectedVariation] = useState(null);
     const [quantity, setQuantity] = useState(1);
+    const [searchQuery, setSearchQuery] = useState('');
+
+    // Variation filtering
+    const [variationAttributes, setVariationAttributes] = useState({});
+    const [availableAttributes, setAvailableAttributes] = useState([]);
+    const [filteredVariations, setFilteredVariations] = useState([]);
 
     useEffect(() => {
         if (order && open) {
@@ -55,15 +66,93 @@ export default function EditOrderModal({ open, onClose, onSuccess, order }) {
         if (open) {
             fetchProducts();
         }
-    }, [open]);
+    }, [open, searchQuery]);
+
+    // Extract available attributes when product is selected
+    useEffect(() => {
+        if (selectedProduct && selectedProduct.variations && selectedProduct.variations.length > 0) {
+            const attributesMap = {};
+
+            selectedProduct.variations.forEach(variation => {
+                if (variation.attributes) {
+                    try {
+                        const attrs = JSON.parse(variation.attributes);
+                        attrs.forEach(attr => {
+                            if (!attributesMap[attr.name]) {
+                                attributesMap[attr.name] = new Set();
+                            }
+                            attributesMap[attr.name].add(attr.option);
+                        });
+                    } catch (e) {
+                        console.error('Failed to parse attributes:', e);
+                    }
+                }
+            });
+
+            const attributes = Object.keys(attributesMap).map(name => ({
+                name,
+                options: Array.from(attributesMap[name]).sort()
+            }));
+
+            setAvailableAttributes(attributes);
+            setVariationAttributes({});
+            setFilteredVariations(selectedProduct.variations);
+        } else {
+            setAvailableAttributes([]);
+            setVariationAttributes({});
+            setFilteredVariations([]);
+        }
+        setSelectedVariation(null);
+    }, [selectedProduct]);
+
+    // Filter variations based on selected attributes
+    useEffect(() => {
+        if (!selectedProduct || !selectedProduct.variations || selectedProduct.variations.length === 0) {
+            setFilteredVariations([]);
+            return;
+        }
+
+        const filtered = selectedProduct.variations.filter(variation => {
+            if (!variation.attributes) return false;
+
+            try {
+                const attrs = JSON.parse(variation.attributes);
+
+                return Object.entries(variationAttributes).every(([attrName, attrValue]) => {
+                    if (!attrValue) return true;
+                    return attrs.some(a => a.name === attrName && a.option === attrValue);
+                });
+            } catch (e) {
+                return false;
+            }
+        });
+
+        setFilteredVariations(filtered);
+
+        // Auto-select if only one variation matches
+        if (filtered.length === 1) {
+            setSelectedVariation(filtered[0]);
+        } else if (filtered.length === 0 || !filtered.find(v => v.id === selectedVariation?.id)) {
+            setSelectedVariation(null);
+        }
+    }, [variationAttributes, selectedProduct]);
 
     const fetchProducts = async () => {
         try {
-            const response = await api.get('/admin/sync/products/search');
+            const response = await api.get('/admin/sync/products/search', {
+                params: { query: searchQuery }
+            });
             setProducts(response.data);
         } catch (error) {
             console.error('Failed to fetch products:', error);
         }
+    };
+
+    const handleAttributeChange = (attributeName, value) => {
+        setVariationAttributes(prev => ({
+            ...prev,
+            [attributeName]: value
+        }));
     };
 
     const showMessage = (message, severity = 'success') => {
@@ -80,20 +169,48 @@ export default function EditOrderModal({ open, onClose, onSuccess, order }) {
             return;
         }
 
-        const price = Number(selectedProduct.price) || 0;
+        // Check if product has variations and no variation is selected
+        if (selectedProduct.variations && selectedProduct.variations.length > 0 && !selectedVariation) {
+            showMessage('Selecteer een variatie', 'warning');
+            return;
+        }
+
+        let itemPrice = selectedProduct.price || 0;
+        let itemName = selectedProduct.name;
+
+        // Use variation price and details if variation is selected
+        if (selectedVariation) {
+            itemPrice = selectedVariation.price || itemPrice;
+
+            // Parse attributes to create a descriptive name
+            try {
+                const attrs = JSON.parse(selectedVariation.attributes);
+                const attrString = attrs.map(a => `${a.name}: ${a.option}`).join(' - ');
+                itemName = `${selectedProduct.name} (${attrString})`;
+            } catch (e) {
+                itemName = `${selectedProduct.name} - ${selectedVariation.sku || 'Variatie'}`;
+            }
+        }
+
         const qty = parseInt(quantity) || 1;
 
         const newItem = {
-            productId: selectedProduct.id,
-            productName: selectedProduct.name,
+            productId: selectedVariation ? selectedVariation.id : selectedProduct.id,
+            variationId: selectedVariation?.id,
+            productName: itemName,
             quantity: qty,
-            price: price,
-            total: price * qty
+            price: itemPrice,
+            total: itemPrice * qty
         };
 
         setItems([...items, newItem]);
         setSelectedProduct(null);
+        setSelectedVariation(null);
+        setVariationAttributes({});
+        setAvailableAttributes([]);
+        setFilteredVariations([]);
         setQuantity(1);
+        setSearchQuery('');
     };
 
     const handleRemoveItem = (index) => {
@@ -165,6 +282,7 @@ export default function EditOrderModal({ open, onClose, onSuccess, order }) {
         setItems([]);
         setSelectedProduct(null);
         setQuantity(1);
+        setSearchQuery('');
         onClose();
     };
 
@@ -210,15 +328,32 @@ export default function EditOrderModal({ open, onClose, onSuccess, order }) {
                     {/* Add Product Section */}
                     <Paper sx={{ p: 2, mb: 3, bgcolor: 'grey.50' }}>
                         <Typography variant="subtitle1" gutterBottom>Product Toevoegen</Typography>
-                        <Box display="flex" gap={2} alignItems="center">
+                        <Box display="flex" gap={2} mb={2}>
                             <Autocomplete
-                                sx={{ flex: 1 }}
+                                fullWidth
                                 options={products}
                                 value={selectedProduct}
-                                onChange={(e, newValue) => setSelectedProduct(newValue)}
+                                onChange={(e, newValue) => {
+                                    setSelectedProduct(newValue);
+                                    setSelectedVariation(null); // Reset variation when product changes
+                                }}
+                                inputValue={searchQuery}
+                                onInputChange={(event, newInputValue) => setSearchQuery(newInputValue)}
                                 getOptionLabel={(option) => `${option.name} - €${Number(option.price).toFixed(2)}`}
                                 renderInput={(params) => (
-                                    <TextField {...params} label="Zoek product" variant="outlined" />
+                                    <TextField {...params} label="Zoek product" placeholder="Type om te zoeken..." variant="outlined" />
+                                )}
+                                renderOption={(props, option) => (
+                                    <li {...props}>
+                                        <Box>
+                                            <Typography variant="body1">{option.name}</Typography>
+                                            <Typography variant="caption" color="textSecondary">
+                                                SKU: {option.sku || 'N/A'} | Prijs: €{option.price}
+                                                {option.variations && option.variations.length > 0 &&
+                                                    ` | ${option.variations.length} variaties`}
+                                            </Typography>
+                                        </Box>
+                                    </li>
                                 )}
                             />
                             <TextField
@@ -233,10 +368,98 @@ export default function EditOrderModal({ open, onClose, onSuccess, order }) {
                                 variant="contained"
                                 startIcon={<AddIcon />}
                                 onClick={handleAddItem}
+                                disabled={!selectedProduct || (selectedProduct?.variations?.length > 0 && !selectedVariation)}
                             >
                                 Toevoegen
                             </Button>
                         </Box>
+
+                        {/* Variation selector - only show if product has variations */}
+                        {selectedProduct && selectedProduct.variations && selectedProduct.variations.length > 0 && (
+                            <Box sx={{ mt: 2, p: 2, bgcolor: 'background.paper', borderRadius: 1, border: '1px solid', borderColor: 'divider' }}>
+                                <Typography variant="subtitle2" gutterBottom>
+                                    Variatie Filters
+                                </Typography>
+                                <Typography variant="caption" color="textSecondary" display="block" gutterBottom>
+                                    Selecteer opties om de variaties te filteren ({filteredVariations.length} van {selectedProduct.variations.length} variaties getoond)
+                                </Typography>
+
+                                {/* Attribute Filter Dropdowns */}
+                                <Box display="flex" flexDirection="column" gap={2} mb={2} mt={2}>
+                                    {availableAttributes.map((attribute) => (
+                                        <FormControl key={attribute.name} fullWidth size="small">
+                                            <InputLabel>{attribute.name}</InputLabel>
+                                            <Select
+                                                value={variationAttributes[attribute.name] || ''}
+                                                onChange={(e) => handleAttributeChange(attribute.name, e.target.value)}
+                                                label={attribute.name}
+                                            >
+                                                <MenuItem value="">
+                                                    <em>Alle</em>
+                                                </MenuItem>
+                                                {attribute.options.map((option) => (
+                                                    <MenuItem key={option} value={option}>
+                                                        {option}
+                                                    </MenuItem>
+                                                ))}
+                                            </Select>
+                                        </FormControl>
+                                    ))}
+                                </Box>
+
+                                {/* Filtered Variations List */}
+                                {filteredVariations.length > 0 && (
+                                    <Box>
+                                        <Typography variant="subtitle2" gutterBottom>
+                                            Selecteer Variatie
+                                        </Typography>
+                                        <FormControl fullWidth size="small">
+                                            <InputLabel>Variatie *</InputLabel>
+                                            <Select
+                                                value={selectedVariation?.id || ''}
+                                                onChange={(e) => {
+                                                    const variation = filteredVariations.find(v => v.id === e.target.value);
+                                                    setSelectedVariation(variation);
+                                                }}
+                                                label="Variatie *"
+                                            >
+                                                {filteredVariations.map((variation) => {
+                                                    const attrs = variation.attributes ?
+                                                        (() => {
+                                                            try {
+                                                                const parsed = JSON.parse(variation.attributes);
+                                                                return parsed.map(a => `${a.name}: ${a.option}`).join(', ');
+                                                            } catch {
+                                                                return variation.attributes;
+                                                            }
+                                                        })() :
+                                                        variation.sku || `Variatie ${variation.id}`;
+
+                                                    return (
+                                                        <MenuItem key={variation.id} value={variation.id}>
+                                                            <Box>
+                                                                <Typography variant="body2">
+                                                                    {attrs}
+                                                                </Typography>
+                                                                <Typography variant="caption" color="textSecondary">
+                                                                    €{variation.price} {variation.sku && `| SKU: ${variation.sku}`}
+                                                                </Typography>
+                                                            </Box>
+                                                        </MenuItem>
+                                                    );
+                                                })}
+                                            </Select>
+                                        </FormControl>
+                                    </Box>
+                                )}
+
+                                {filteredVariations.length === 0 && (
+                                    <Alert severity="info" sx={{ mt: 2 }}>
+                                        Geen variaties gevonden met de geselecteerde filters
+                                    </Alert>
+                                )}
+                            </Box>
+                        )}
                     </Paper>
 
                     {/* Items Table */}

@@ -70,6 +70,12 @@ public class SyncMonitorController {
     @Autowired
     private nl.embediq.woocommerce.service.DashboardService dashboardService;
 
+    @Autowired
+    private nl.embediq.woocommerce.repository.VariationAttributeRepository variationAttributeRepository;
+
+    @Autowired
+    private nl.embediq.woocommerce.service.ColorVariationService colorVariationService;
+
     // ==================== DASHBOARD ====================
 
     @GetMapping("/dashboard")
@@ -1175,55 +1181,72 @@ public class SyncMonitorController {
             product.setRegularPrice(request.getPrice());
             product.setDescription(request.getDescription());
             product.setShortDescription(request.getShortDescription());
-
-            // Set type based on whether it has variations
-            if (request.getVariations() != null && !request.getVariations().isEmpty()) {
-                product.setType("variable");
-            } else {
-                product.setType("simple");
-            }
-
             product.setStatus("publish");
             product.setCreatedAt(LocalDateTime.now());
 
+            // Save product first
             product = productRepository.save(product);
 
-            // Create variations if provided
-            if (request.getVariations() != null && !request.getVariations().isEmpty()) {
-                for (ProductVariationCreateRequest varReq : request.getVariations()) {
+            // Handle variations
+            boolean hasManualVariations = request.getVariations() != null && !request.getVariations().isEmpty();
+
+            if (hasManualVariations) {
+                // Add manual variations provided by user
+                log.info("Adding {} manual variations to product", request.getVariations().size());
+
+                for (ProductVariationCreateRequest varRequest : request.getVariations()) {
                     nl.embediq.woocommerce.entity.ProductVariation variation =
                         new nl.embediq.woocommerce.entity.ProductVariation();
 
                     variation.setProduct(product);
                     variation.setSku(skuGeneratorService.generateUniqueSku());
-                    variation.setPrice(varReq.getPrice());
-                    variation.setRegularPrice(varReq.getRegularPrice() != null ?
-                        varReq.getRegularPrice() : varReq.getPrice());
-                    variation.setSalePrice(varReq.getSalePrice());
-                    variation.setDescription(varReq.getDescription());
-                    variation.setAttributes(varReq.getAttributes());
-                    variation.setWeight(varReq.getWeight());
-                    variation.setDimensions(varReq.getDimensions());
+                    variation.setPrice(varRequest.getPrice());
+                    variation.setRegularPrice(varRequest.getRegularPrice() != null ?
+                        varRequest.getRegularPrice() : varRequest.getPrice());
+                    variation.setSalePrice(varRequest.getSalePrice());
+                    variation.setDescription(varRequest.getDescription());
+                    variation.setAttributes(varRequest.getAttributes());
+                    variation.setWeight(varRequest.getWeight());
+                    variation.setDimensions(varRequest.getDimensions());
                     variation.setStatus("publish");
                     variation.setCreatedAt(LocalDateTime.now());
 
                     product.getVariations().add(variation);
                 }
 
+                product.setType("variable");
                 product = productRepository.save(product);
-                log.info("Created {} variations for product ID: {}",
-                    request.getVariations().size(), product.getId());
+
+                log.info("Product created successfully with ID: {} and SKU: {} with {} manual variations",
+                    product.getId(), product.getSku(), request.getVariations().size());
+            } else {
+                // Automatically add all color variations only if no manual variations provided
+                log.info("No manual variations provided, adding automatic color variations");
+                colorVariationService.syncProductColorVariations(product);
+
+                // Update product type based on variations
+                product = productRepository.findById(product.getId()).orElse(product);
+                if (!product.getVariations().isEmpty()) {
+                    product.setType("variable");
+                } else {
+                    product.setType("simple");
+                }
+                product = productRepository.save(product);
+
+                log.info("Product created successfully with ID: {} and SKU: {} with automatic color variations",
+                    product.getId(), product.getSku());
             }
 
-            log.info("Product created successfully with ID: {} and SKU: {}",
-                product.getId(), product.getSku());
-
             ProductDTO dto = convertToProductDTO(product);
+
+            String message = hasManualVariations
+                ? "Product created successfully with " + request.getVariations().size() + " manual variation(s)"
+                : "Product created successfully with automatic color variations";
 
             return ResponseEntity.ok(Map.of(
                 "success", true,
                 "product", dto,
-                "message", "Product created successfully"
+                "message", message
             ));
 
         } catch (Exception e) {
@@ -1243,23 +1266,143 @@ public class SyncMonitorController {
             nl.embediq.woocommerce.entity.Product product = productRepository.findById(productId)
                 .orElseThrow(() -> new RuntimeException("Product not found"));
 
-            nl.embediq.woocommerce.entity.ProductVariation variation =
-                new nl.embediq.woocommerce.entity.ProductVariation();
+            com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
 
-            variation.setProduct(product);
-            variation.setSku(skuGeneratorService.generateUniqueSku());
-            variation.setPrice(request.getPrice());
-            variation.setRegularPrice(request.getRegularPrice() != null ?
-                request.getRegularPrice() : request.getPrice());
-            variation.setSalePrice(request.getSalePrice());
-            variation.setDescription(request.getDescription());
-            variation.setAttributes(request.getAttributes());
-            variation.setWeight(request.getWeight());
-            variation.setDimensions(request.getDimensions());
-            variation.setStatus("publish");
-            variation.setCreatedAt(LocalDateTime.now());
+            // Parse the new attribute from the request
+            List<Map<String, String>> newAttrList = mapper.readValue(
+                request.getAttributes(),
+                new com.fasterxml.jackson.core.type.TypeReference<List<Map<String, String>>>() {}
+            );
 
-            product.getVariations().add(variation);
+            if (newAttrList.isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "error", "No attributes provided"
+                ));
+            }
+
+            // Get the new attribute name and value
+            Map<String, String> newAttr = newAttrList.get(0);
+            String newAttrName = newAttr.get("name");
+            String newAttrValue = newAttr.get("option");
+
+            log.info("Adding variation with attribute '{}': '{}' to product ID: {}",
+                newAttrName, newAttrValue, productId);
+
+            List<nl.embediq.woocommerce.entity.ProductVariation> newVariationsToAdd = new ArrayList<>();
+
+            // Check if product already has variations
+            if (product.getVariations().isEmpty()) {
+                // No existing variations - just create one with the new attribute
+                nl.embediq.woocommerce.entity.ProductVariation variation =
+                    new nl.embediq.woocommerce.entity.ProductVariation();
+
+                variation.setProduct(product);
+                variation.setSku(skuGeneratorService.generateUniqueSku());
+                variation.setPrice(request.getPrice() != null ? request.getPrice() : product.getPrice());
+                variation.setRegularPrice(request.getRegularPrice() != null ?
+                    request.getRegularPrice() : (request.getPrice() != null ? request.getPrice() : product.getPrice()));
+                variation.setSalePrice(request.getSalePrice());
+                variation.setDescription(request.getDescription() != null ? request.getDescription() :
+                    newAttrName + ": " + newAttrValue);
+                variation.setAttributes(request.getAttributes());
+                variation.setWeight(request.getWeight());
+                variation.setDimensions(request.getDimensions());
+                variation.setStatus("publish");
+                variation.setCreatedAt(LocalDateTime.now());
+
+                newVariationsToAdd.add(variation);
+                log.info("Created single variation (no existing variations)");
+
+            } else {
+                // Product has existing variations - create combinations
+                log.info("Product has {} existing variations, creating combinations...", product.getVariations().size());
+
+                // Get all unique combinations of existing attributes (excluding this new attribute name)
+                Map<String, nl.embediq.woocommerce.entity.ProductVariation> uniqueVariations = new HashMap<>();
+
+                for (nl.embediq.woocommerce.entity.ProductVariation existingVar : product.getVariations()) {
+                    List<Map<String, String>> existingAttrList = mapper.readValue(
+                        existingVar.getAttributes(),
+                        new com.fasterxml.jackson.core.type.TypeReference<List<Map<String, String>>>() {}
+                    );
+
+                    // Create a key from all attributes EXCEPT the new attribute name
+                    String otherAttrsKey = existingAttrList.stream()
+                        .filter(attr -> !attr.get("name").equals(newAttrName))
+                        .map(attr -> attr.get("name") + ":" + attr.get("option"))
+                        .sorted()
+                        .collect(Collectors.joining("|"));
+
+                    // Keep only the first variation for each unique combination
+                    if (!uniqueVariations.containsKey(otherAttrsKey)) {
+                        uniqueVariations.put(otherAttrsKey, existingVar);
+                    }
+                }
+
+                log.info("Found {} unique combinations to extend", uniqueVariations.size());
+
+                // For each unique combination, create a new variation with the new attribute
+                for (nl.embediq.woocommerce.entity.ProductVariation templateVar : uniqueVariations.values()) {
+                    List<Map<String, String>> templateAttrList = mapper.readValue(
+                        templateVar.getAttributes(),
+                        new com.fasterxml.jackson.core.type.TypeReference<List<Map<String, String>>>() {}
+                    );
+
+                    // Add the new attribute to the template
+                    List<Map<String, String>> combinedAttrList = new ArrayList<>(templateAttrList);
+
+                    // Remove any existing attribute with the same name (in case it exists)
+                    combinedAttrList.removeIf(attr -> attr.get("name").equals(newAttrName));
+
+                    // Add the new attribute
+                    combinedAttrList.add(newAttr);
+
+                    String combinedAttrJson = mapper.writeValueAsString(combinedAttrList);
+
+                    // Check if this exact combination already exists
+                    boolean alreadyExists = product.getVariations().stream()
+                        .anyMatch(v -> {
+                            try {
+                                return v.getAttributes().equals(combinedAttrJson);
+                            } catch (Exception e) {
+                                return false;
+                            }
+                        });
+
+                    if (alreadyExists) {
+                        log.debug("Variation already exists, skipping");
+                        continue;
+                    }
+
+                    // Create new variation
+                    nl.embediq.woocommerce.entity.ProductVariation newVariation =
+                        new nl.embediq.woocommerce.entity.ProductVariation();
+
+                    newVariation.setProduct(product);
+                    newVariation.setSku(skuGeneratorService.generateUniqueSku());
+                    newVariation.setPrice(request.getPrice() != null ? request.getPrice() : product.getPrice());
+                    newVariation.setRegularPrice(request.getRegularPrice() != null ?
+                        request.getRegularPrice() : (request.getPrice() != null ? request.getPrice() : product.getPrice()));
+                    newVariation.setSalePrice(request.getSalePrice());
+
+                    String description = combinedAttrList.stream()
+                        .map(attr -> attr.get("name") + ": " + attr.get("option"))
+                        .collect(Collectors.joining(", "));
+                    newVariation.setDescription(description);
+
+                    newVariation.setAttributes(combinedAttrJson);
+                    newVariation.setWeight(request.getWeight());
+                    newVariation.setDimensions(request.getDimensions());
+                    newVariation.setStatus("publish");
+                    newVariation.setCreatedAt(LocalDateTime.now());
+
+                    newVariationsToAdd.add(newVariation);
+                }
+            }
+
+            // Add all new variations
+            product.getVariations().addAll(newVariationsToAdd);
 
             // Update product type to variable if it was simple
             if ("simple".equals(product.getType())) {
@@ -1268,24 +1411,31 @@ public class SyncMonitorController {
 
             productRepository.save(product);
 
-            log.info("Added variation to product ID: {}", productId);
+            log.info("Added {} variation(s) to product ID: {}", newVariationsToAdd.size(), productId);
 
-            ProductVariationDTO dto = new ProductVariationDTO();
-            dto.setId(variation.getId());
-            dto.setSku(variation.getSku());
-            dto.setPrice(variation.getPrice());
-            dto.setRegularPrice(variation.getRegularPrice());
-            dto.setSalePrice(variation.getSalePrice());
-            dto.setDescription(variation.getDescription());
-            dto.setAttributes(variation.getAttributes());
-            dto.setWeight(variation.getWeight());
-            dto.setDimensions(variation.getDimensions());
-            dto.setStatus(variation.getStatus());
+            // Return info about added variations
+            List<ProductVariationDTO> addedDTOs = newVariationsToAdd.stream()
+                .map(v -> {
+                    ProductVariationDTO dto = new ProductVariationDTO();
+                    dto.setId(v.getId());
+                    dto.setSku(v.getSku());
+                    dto.setPrice(v.getPrice());
+                    dto.setRegularPrice(v.getRegularPrice());
+                    dto.setSalePrice(v.getSalePrice());
+                    dto.setDescription(v.getDescription());
+                    dto.setAttributes(v.getAttributes());
+                    dto.setWeight(v.getWeight());
+                    dto.setDimensions(v.getDimensions());
+                    dto.setStatus(v.getStatus());
+                    return dto;
+                })
+                .collect(Collectors.toList());
 
             return ResponseEntity.ok(Map.of(
                 "success", true,
-                "variation", dto,
-                "message", "Variation added successfully"
+                "variations", addedDTOs,
+                "count", newVariationsToAdd.size(),
+                "message", String.format("Added %d variation(s) successfully", newVariationsToAdd.size())
             ));
 
         } catch (Exception e) {
@@ -1723,6 +1873,465 @@ public class SyncMonitorController {
         dto.setExpenseDate(expense.getExpenseDate());
         dto.setCreatedAt(expense.getCreatedAt());
         dto.setUpdatedAt(expense.getUpdatedAt());
+        return dto;
+    }
+
+    // ==================== VARIATION ATTRIBUTES ====================
+
+    @GetMapping("/variation-attributes")
+    public ResponseEntity<List<VariationAttributeDTO>> getAllVariationAttributes() {
+        List<nl.embediq.woocommerce.entity.VariationAttribute> attributes = 
+            variationAttributeRepository.findByActiveTrue();
+        
+        List<VariationAttributeDTO> dtos = attributes.stream()
+            .map(this::convertToVariationAttributeDTO)
+            .collect(Collectors.toList());
+        
+        return ResponseEntity.ok(dtos);
+    }
+
+    @GetMapping("/variation-attributes/type/{type}")
+    public ResponseEntity<List<VariationAttributeDTO>> getVariationAttributesByType(
+            @PathVariable String type) {
+        List<nl.embediq.woocommerce.entity.VariationAttribute> attributes = 
+            variationAttributeRepository.findByAttributeTypeOrderBySortOrder(type);
+        
+        List<VariationAttributeDTO> dtos = attributes.stream()
+            .map(this::convertToVariationAttributeDTO)
+            .collect(Collectors.toList());
+        
+        return ResponseEntity.ok(dtos);
+    }
+
+    // ==================== COLOR MANAGEMENT ====================
+
+    @GetMapping("/colors")
+    public ResponseEntity<List<VariationAttributeDTO>> getColors() {
+        List<nl.embediq.woocommerce.entity.VariationAttribute> colors =
+            variationAttributeRepository.findByAttributeTypeOrderBySortOrder("color");
+
+        List<VariationAttributeDTO> dtos = colors.stream()
+            .map(this::convertToVariationAttributeDTO)
+            .collect(Collectors.toList());
+
+        return ResponseEntity.ok(dtos);
+    }
+
+    @PostMapping("/colors")
+    public ResponseEntity<?> createColor(@RequestBody VariationAttributeCreateRequest request) {
+        try {
+            nl.embediq.woocommerce.entity.VariationAttribute color =
+                new nl.embediq.woocommerce.entity.VariationAttribute();
+
+            color.setAttributeType("color");
+            color.setAttributeName(request.getAttributeName());
+            color.setAttributeValue(request.getAttributeValue());
+            color.setHexCode(request.getHexCode());
+            color.setSortOrder(request.getSortOrder() != null ? request.getSortOrder() : 0);
+            color.setActive(true);
+
+            color = variationAttributeRepository.save(color);
+
+            log.info("Color created: {} ({})", color.getAttributeName(), color.getHexCode());
+
+            // Create final reference for use in lambda
+            final String newColorName = color.getAttributeName();
+
+            log.info("Searching for products to add new color '{}' to...", newColorName);
+
+            // Find all products that have variations with color attributes
+            List<nl.embediq.woocommerce.entity.Product> allProducts = productRepository.findAll();
+            log.info("Total products in database: {}", allProducts.size());
+
+            List<nl.embediq.woocommerce.entity.Product> productsWithColorVariations =
+                allProducts.stream()
+                    .filter(p -> {
+                        boolean hasVariations = p.getVariations() != null && !p.getVariations().isEmpty();
+                        if (hasVariations) {
+                            log.debug("Product '{}' has {} variations", p.getName(), p.getVariations().size());
+                        }
+                        return hasVariations;
+                    })
+                    .filter(p -> {
+                        // Check if any variation has color attributes
+                        boolean hasColorAttrs = p.getVariations().stream().anyMatch(v -> {
+                            try {
+                                String attrs = v.getAttributes();
+                                if (attrs != null) {
+                                    // Check if attributes contain "kleur" (case insensitive)
+                                    boolean isColor = attrs.toLowerCase().contains("kleur");
+                                    if (isColor) {
+                                        log.debug("Product '{}' has color variation: {}", p.getName(), attrs);
+                                    }
+                                    return isColor;
+                                }
+                            } catch (Exception e) {
+                                log.error("Error checking attributes for product {}: {}", p.getId(), e.getMessage());
+                                return false;
+                            }
+                            return false;
+                        });
+                        return hasColorAttrs;
+                    })
+                    .collect(Collectors.toList());
+
+            log.info("Found {} products with color variations", productsWithColorVariations.size());
+
+            int totalAddedVariations = 0;
+            for (nl.embediq.woocommerce.entity.Product product : productsWithColorVariations) {
+                try {
+                    log.info("Processing product '{}' (ID: {})", product.getName(), product.getId());
+
+                    // Get existing variations to understand the attribute structure
+                    List<nl.embediq.woocommerce.entity.ProductVariation> existingVariations = product.getVariations();
+                    if (existingVariations.isEmpty()) {
+                        log.debug("Product has no variations, skipping");
+                        continue;
+                    }
+
+                    // Parse the attributes from the first variation to understand the structure
+                    String firstVariationAttrs = existingVariations.get(0).getAttributes();
+                    if (firstVariationAttrs == null) {
+                        log.debug("First variation has no attributes, skipping");
+                        continue;
+                    }
+
+                    // Parse JSON attributes
+                    com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+                    List<Map<String, String>> firstAttrList = mapper.readValue(
+                        firstVariationAttrs,
+                        new com.fasterxml.jackson.core.type.TypeReference<List<Map<String, String>>>() {}
+                    );
+
+                    // Find all color attribute names (e.g., "Pallet kleur", "Kratkleur", "Krat inhoud kleur")
+                    Set<String> colorAttributeNames = firstAttrList.stream()
+                        .map(attr -> attr.get("name"))
+                        .filter(name -> name != null && name.toLowerCase().contains("kleur"))
+                        .collect(Collectors.toSet());
+
+                    if (colorAttributeNames.isEmpty()) {
+                        log.debug("No color attributes found in product, skipping");
+                        continue;
+                    }
+
+                    log.info("Found {} color attributes: {}", colorAttributeNames.size(), colorAttributeNames);
+
+                    // IMPORTANT: Collect all new variations first, then add them all at once
+                    // This avoids ConcurrentModificationException
+                    List<nl.embediq.woocommerce.entity.ProductVariation> newVariationsToAdd = new ArrayList<>();
+
+                    // For EACH color attribute, we need to add the new color
+                    // But we should only create variations for unique combinations of OTHER attributes
+                    for (String targetColorAttr : colorAttributeNames) {
+                        log.debug("Adding new color '{}' to attribute '{}'", newColorName, targetColorAttr);
+
+                        // Group existing variations by their non-target-color attributes
+                        // This ensures we only create one new variation per unique combination
+                        Map<String, nl.embediq.woocommerce.entity.ProductVariation> uniqueCombinations = new HashMap<>();
+
+                        for (nl.embediq.woocommerce.entity.ProductVariation existingVar : existingVariations) {
+                            List<Map<String, String>> existingAttrList = mapper.readValue(
+                                existingVar.getAttributes(),
+                                new com.fasterxml.jackson.core.type.TypeReference<List<Map<String, String>>>() {}
+                            );
+
+                            // Create a key from all attributes EXCEPT the target color attribute
+                            String otherAttrsKey = existingAttrList.stream()
+                                .filter(attr -> !attr.get("name").equals(targetColorAttr))
+                                .map(attr -> attr.get("name") + ":" + attr.get("option"))
+                                .sorted()
+                                .collect(Collectors.joining("|"));
+
+                            // Only keep the first variation we find for each unique combination
+                            if (!uniqueCombinations.containsKey(otherAttrsKey)) {
+                                uniqueCombinations.put(otherAttrsKey, existingVar);
+                            }
+                        }
+
+                        log.debug("Found {} unique combinations for attribute '{}'", uniqueCombinations.size(), targetColorAttr);
+
+                        // Now create ONE new variation for each unique combination
+                        for (nl.embediq.woocommerce.entity.ProductVariation templateVar : uniqueCombinations.values()) {
+                            List<Map<String, String>> templateAttrList = mapper.readValue(
+                                templateVar.getAttributes(),
+                                new com.fasterxml.jackson.core.type.TypeReference<List<Map<String, String>>>() {}
+                            );
+
+                            // Create new attributes by replacing the target color attribute with the new color
+                            List<Map<String, String>> newAttrList = new ArrayList<>();
+                            for (Map<String, String> attr : templateAttrList) {
+                                Map<String, String> newAttr = new HashMap<>();
+                                String attrName = attr.get("name");
+
+                                if (attrName.equals(targetColorAttr)) {
+                                    // Replace this color attribute with the new color
+                                    newAttr.put("name", attrName);
+                                    newAttr.put("option", newColorName);
+                                } else {
+                                    // Keep other attributes as-is
+                                    newAttr.put("name", attr.get("name"));
+                                    newAttr.put("option", attr.get("option"));
+                                }
+                                newAttrList.add(newAttr);
+                            }
+
+                            // Check if this exact combination already exists
+                            String newAttrJson = mapper.writeValueAsString(newAttrList);
+                            boolean alreadyExists = existingVariations.stream()
+                                .anyMatch(v -> {
+                                    try {
+                                        return v.getAttributes().equals(newAttrJson);
+                                    } catch (Exception e) {
+                                        return false;
+                                    }
+                                });
+
+                            if (alreadyExists) {
+                                log.debug("Variation already exists, skipping");
+                                continue;
+                            }
+
+                            // Create new variation
+                            nl.embediq.woocommerce.entity.ProductVariation newVariation =
+                                new nl.embediq.woocommerce.entity.ProductVariation();
+
+                            newVariation.setProduct(product);
+                            newVariation.setSku(skuGeneratorService.generateUniqueSku());
+                            newVariation.setPrice(product.getPrice());
+                            newVariation.setRegularPrice(product.getPrice());
+                            newVariation.setAttributes(newAttrJson);
+
+                            String description = newAttrList.stream()
+                                .map(attr -> attr.get("name") + ": " + attr.get("option"))
+                                .collect(Collectors.joining(", "));
+                            newVariation.setDescription(description);
+
+                            newVariation.setStatus("publish");
+                            newVariation.setCreatedAt(LocalDateTime.now());
+
+                            newVariationsToAdd.add(newVariation);
+                            totalAddedVariations++;
+
+                            log.debug("Created variation: {}", description);
+                        }
+                    }
+
+                    // Add all new variations at once (avoids ConcurrentModificationException)
+                    if (!newVariationsToAdd.isEmpty()) {
+                        product.getVariations().addAll(newVariationsToAdd);
+                        productRepository.save(product);
+                        log.info("Added {} variations with new color '{}' to product '{}'",
+                            newVariationsToAdd.size(), newColorName, product.getName());
+                    }
+
+                } catch (Exception e) {
+                    log.error("Failed to add new color to product {}: {}", product.getId(), e.getMessage(), e);
+                }
+            }
+
+            log.info("New color '{}' added to {} variations across {} products",
+                newColorName, totalAddedVariations, productsWithColorVariations.size());
+
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "color", convertToVariationAttributeDTO(color),
+                "addedToProducts", productsWithColorVariations.size(),
+                "totalVariationsAdded", totalAddedVariations,
+                "message", String.format("Kleur aangemaakt en toegevoegd aan %d product(en) (%d variaties)",
+                    productsWithColorVariations.size(), totalAddedVariations)
+            ));
+        } catch (Exception e) {
+            log.error("Failed to create color", e);
+            return ResponseEntity.badRequest().body(Map.of(
+                "success", false,
+                "error", e.getMessage()
+            ));
+        }
+    }
+
+    @PutMapping("/colors/{id}")
+    public ResponseEntity<?> updateColor(
+            @PathVariable Long id,
+            @RequestBody VariationAttributeCreateRequest request) {
+        try {
+            nl.embediq.woocommerce.entity.VariationAttribute color =
+                variationAttributeRepository.findById(id)
+                    .orElseThrow(() -> new RuntimeException("Color not found"));
+
+            color.setAttributeName(request.getAttributeName());
+            color.setAttributeValue(request.getAttributeValue());
+            color.setHexCode(request.getHexCode());
+            if (request.getSortOrder() != null) {
+                color.setSortOrder(request.getSortOrder());
+            }
+
+            color = variationAttributeRepository.save(color);
+
+            log.info("Color updated: {} ({})", color.getAttributeName(), color.getHexCode());
+
+            return ResponseEntity.ok(convertToVariationAttributeDTO(color));
+        } catch (Exception e) {
+            log.error("Failed to update color", e);
+            return ResponseEntity.badRequest().body(Map.of(
+                "success", false,
+                "error", e.getMessage()
+            ));
+        }
+    }
+
+    @DeleteMapping("/colors/{id}")
+    public ResponseEntity<?> deleteColor(@PathVariable Long id) {
+        try {
+            nl.embediq.woocommerce.entity.VariationAttribute color =
+                variationAttributeRepository.findById(id)
+                    .orElseThrow(() -> new RuntimeException("Color not found"));
+
+            variationAttributeRepository.delete(color);
+
+            log.info("Color deleted: {}", color.getAttributeName());
+
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "message", "Color deleted successfully"
+            ));
+        } catch (Exception e) {
+            log.error("Failed to delete color", e);
+            return ResponseEntity.badRequest().body(Map.of(
+                "success", false,
+                "error", e.getMessage()
+            ));
+        }
+    }
+
+    @PostMapping("/products/{productId}/variations/bulk")
+    public ResponseEntity<?> addBulkVariations(
+            @PathVariable Long productId,
+            @RequestBody BulkVariationCreateRequest request) {
+        try {
+            nl.embediq.woocommerce.entity.Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new RuntimeException("Product not found"));
+
+            List<nl.embediq.woocommerce.entity.ProductVariation> createdVariations = new ArrayList<>();
+
+            // Auto-generate from selected attributes (e.g., colors from DB)
+            if (request.getSelectedAttributeIds() != null && !request.getSelectedAttributeIds().isEmpty()) {
+                for (Long attributeId : request.getSelectedAttributeIds()) {
+                    nl.embediq.woocommerce.entity.VariationAttribute attr = 
+                        variationAttributeRepository.findById(attributeId)
+                            .orElseThrow(() -> new RuntimeException("Attribute not found"));
+
+                    nl.embediq.woocommerce.entity.ProductVariation variation = 
+                        new nl.embediq.woocommerce.entity.ProductVariation();
+                    
+                    variation.setProduct(product);
+                    variation.setSku(skuGeneratorService.generateUniqueSku());
+                    variation.setPrice(request.getBasePrice());
+                    variation.setRegularPrice(request.getBasePrice());
+                    
+                    // Create attributes JSON
+                    String attributes = String.format("[{\"name\":\"%s\",\"option\":\"%s\"}]", 
+                        attr.getAttributeType(), attr.getAttributeValue());
+                    variation.setAttributes(attributes);
+                    
+                    variation.setDescription(attr.getAttributeName());
+                    variation.setStatus("publish");
+                    variation.setCreatedAt(LocalDateTime.now());
+                    
+                    product.getVariations().add(variation);
+                    createdVariations.add(variation);
+                    
+                    log.info("Created variation for product {}: {} - {}", 
+                        productId, attr.getAttributeType(), attr.getAttributeName());
+                }
+            }
+
+            // Add manual variations
+            if (request.getManualVariations() != null && !request.getManualVariations().isEmpty()) {
+                for (BulkVariationCreateRequest.ManualVariation manual : request.getManualVariations()) {
+                    nl.embediq.woocommerce.entity.ProductVariation variation = 
+                        new nl.embediq.woocommerce.entity.ProductVariation();
+                    
+                    variation.setProduct(product);
+                    variation.setSku(skuGeneratorService.generateUniqueSku());
+                    variation.setPrice(manual.getPrice());
+                    variation.setRegularPrice(manual.getPrice());
+                    
+                    // Create attributes JSON
+                    String attributes = String.format("[{\"name\":\"%s\",\"option\":\"%s\"}]", 
+                        manual.getAttributeName(), manual.getAttributeValue());
+                    variation.setAttributes(attributes);
+                    
+                    variation.setDescription(manual.getDescription());
+                    variation.setStatus("publish");
+                    variation.setCreatedAt(LocalDateTime.now());
+                    
+                    product.getVariations().add(variation);
+                    createdVariations.add(variation);
+                    
+                    log.info("Created manual variation for product {}: {} - {}", 
+                        productId, manual.getAttributeName(), manual.getAttributeValue());
+                }
+            }
+
+            // Update product type to variable
+            if (!createdVariations.isEmpty() && "simple".equals(product.getType())) {
+                product.setType("variable");
+            }
+
+            productRepository.save(product);
+
+            log.info("Added {} variations to product ID: {}", createdVariations.size(), productId);
+
+            // Convert to DTOs
+            List<ProductVariationDTO> dtos = createdVariations.stream()
+                .map(this::convertToVariationDTO)
+                .collect(Collectors.toList());
+
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "message", createdVariations.size() + " variatie(s) succesvol toegevoegd",
+                "variations", dtos
+            ));
+
+        } catch (Exception e) {
+            log.error("Failed to add bulk variations to product {}", productId, e);
+            return ResponseEntity.badRequest().body(Map.of(
+                "success", false,
+                "error", e.getMessage()
+            ));
+        }
+    }
+
+    private VariationAttributeDTO convertToVariationAttributeDTO(
+            nl.embediq.woocommerce.entity.VariationAttribute attr) {
+        VariationAttributeDTO dto = new VariationAttributeDTO();
+        dto.setId(attr.getId());
+        dto.setAttributeType(attr.getAttributeType());
+        dto.setAttributeName(attr.getAttributeName());
+        dto.setAttributeValue(attr.getAttributeValue());
+        dto.setHexCode(attr.getHexCode());
+        dto.setSortOrder(attr.getSortOrder());
+        dto.setActive(attr.getActive());
+        dto.setCreatedAt(attr.getCreatedAt());
+        return dto;
+    }
+
+    private ProductVariationDTO convertToVariationDTO(
+            nl.embediq.woocommerce.entity.ProductVariation variation) {
+        ProductVariationDTO dto = new ProductVariationDTO();
+        dto.setId(variation.getId());
+        dto.setWooCommerceId(variation.getWooCommerceId());
+        dto.setSku(variation.getSku());
+        dto.setPrice(variation.getPrice());
+        dto.setRegularPrice(variation.getRegularPrice());
+        dto.setSalePrice(variation.getSalePrice());
+        dto.setDescription(variation.getDescription());
+        dto.setAttributes(variation.getAttributes());
+        dto.setWeight(variation.getWeight());
+        dto.setDimensions(variation.getDimensions());
+        dto.setStatus(variation.getStatus());
+        dto.setCreatedAt(variation.getCreatedAt());
+        dto.setLastSyncedAt(variation.getLastSyncedAt());
         return dto;
     }
 }

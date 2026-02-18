@@ -155,7 +155,7 @@ export default function ProductsOverview() {
 
     return (
         <Box sx={{ p: 3 }}>
-            <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
                 <Typography variant="h4">Producten</Typography>
                 <Box>
                     <Button
@@ -170,6 +170,7 @@ export default function ProductsOverview() {
                         variant="outlined"
                         startIcon={<Refresh />}
                         onClick={fetchProducts}
+                        sx={{ mr: 1 }}
                     >
                         Ververs
                     </Button>
@@ -309,6 +310,7 @@ export default function ProductsOverview() {
                                             <TableCell>Type</TableCell>
                                             <TableCell align="right">Prijs</TableCell>
                                             <TableCell>Status</TableCell>
+                                            <TableCell>Laatst gesynchroniseerd</TableCell>
                                             <TableCell align="center">Acties</TableCell>
                                         </TableRow>
                                     </TableHead>
@@ -382,6 +384,20 @@ export default function ProductsOverview() {
                                                             color={getStatusColor(product.status)}
                                                             size="small"
                                                         />
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <Typography variant="body2" color="textSecondary">
+                                                            {product.lastSyncedAt ?
+                                                                new Date(product.lastSyncedAt).toLocaleString('nl-NL', {
+                                                                    day: '2-digit',
+                                                                    month: '2-digit',
+                                                                    year: 'numeric',
+                                                                    hour: '2-digit',
+                                                                    minute: '2-digit'
+                                                                }) :
+                                                                'Nooit'
+                                                            }
+                                                        </Typography>
                                                     </TableCell>
                                                     <TableCell align="center">
                                                         {!product.wooCommerceId && (

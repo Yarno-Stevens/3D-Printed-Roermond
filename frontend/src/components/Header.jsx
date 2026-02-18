@@ -39,6 +39,11 @@ export default function Header() {
         navigate("/sync");
     }
 
+    function goToColorManagement() {
+        setIsDropdownOpen(false);
+        navigate("/settings/colors");
+    }
+
     return (
         <div className="w-full h-full bg-Primary">
             <div className="container mx-auto py-6 px-4 flex flex-col items-center w-full">
@@ -76,6 +81,12 @@ export default function Header() {
                                     onClick={sync}
                                 >
                                     Synchroniseren
+                                </button>
+                                <button
+                                    className="block w-full text-left px-4 py-3 text-gray-800 hover:bg-gray-100 border-b border-gray-200"
+                                    onClick={goToColorManagement}
+                                >
+                                    Kleuren Beheer
                                 </button>
                                 <button
                                     className="flex items-center gap-2 w-full text-left px-4 py-3 text-gray-800 hover:bg-gray-100"

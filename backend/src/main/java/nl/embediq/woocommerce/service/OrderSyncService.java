@@ -280,7 +280,6 @@ public class OrderSyncService {
             Optional<Customer> existing = customerRepository.findByEmail(billing.getEmail());
             if (existing.isPresent()) {
                 Customer customer = existing.get();
-                log.debug("Found existing customer with email: {}", billing.getEmail());
 
                 // Update address if customer doesn't have one yet
                 boolean needsUpdate = false;
@@ -296,7 +295,7 @@ public class OrderSyncService {
                     needsUpdate = true;
                 }
 
-                // Update company name if empty
+            log.debug("Created new guest customer with email and address: {}", billing.getEmail());
                 if (customer.getCompanyName() == null || customer.getCompanyName().isEmpty()) {
                     if (billing.getCompany() != null && !billing.getCompany().isEmpty()) {
                         customer.setCompanyName(billing.getCompany());
@@ -349,7 +348,7 @@ public class OrderSyncService {
 
         try {
             customer = customerRepository.save(customer);
-            log.debug("Created new guest customer with email and address: {}", billing.getEmail());
+            log.debug("Created new guest customer with email: {}", billing.getEmail());
             return customer;
         } catch (Exception e) {
             log.error("Error saving guest customer with email {}: {}", billing.getEmail(), e.getMessage());

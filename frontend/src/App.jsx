@@ -10,6 +10,7 @@ import SyncDashboard from "./sync/SyncDashboard.jsx";
 import CustomerDetail from "./customer/CustomerDetail.jsx";
 import OrderDetail from "./order/OrderDetail.jsx";
 import ProductDetail from "./product/ProductDetail.jsx";
+import ColorManagement from "./settings/ColorManagement.jsx";
 import Login from "./Login.jsx";
 import ProtectedRoute from "./components/ProtectedRoute.jsx";
 
@@ -35,6 +36,7 @@ function App() {
                                 <Route path="/orders/:id" element={<OrderDetail />} />
                                 <Route path="/customers/:id" element={<CustomerDetail />} />
                                 <Route path="/products/:id" element={<ProductDetail />} />
+                                <Route path="/settings/colors" element={<ColorManagement />} />
                             </Routes>
                         </div>
                     </>
